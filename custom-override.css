@@ -1,0 +1,22 @@
+/* Apply Japanese font stack to body and all text elements */
+body, h1, h2, h3, h4, h5, h6, p, div, span, a {
+    font-family: '游ゴシック', 'Yu Gothic', YuGothic, 'Hiragino Sans', 'ヒラギノ角ゴシック', 'Hiragino Kaku Gothic ProN', 'ヒラギノ角ゴ ProN W3', 'Hiragino Kaku Gothic ProN W3', 'Hiragino Kaku Gothic Pro', 'メイリオ', Meiryo, Osaka, sans-serif !important;
+}
+
+/* Center the investment button */
+#investmentButton {
+    /* Remove original positioning */
+    bottom: auto !important;
+    right: auto !important;
+
+    /* Center it horizontally and vertically */
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+
+    /* Make it 3 times larger */
+    width: 600px !important;
+    height: 180px !important;
+    z-index: 1000 !important;
+}

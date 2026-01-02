@@ -1,0 +1,17 @@
+/* Center the investment button */
+#investmentButton {
+    /* Remove original positioning */
+    bottom: auto !important;
+    right: auto !important;
+
+    /* Center it horizontally and vertically */
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+
+    /* Make it 3 times larger */
+    width: 600px !important;
+    height: 180px !important;
+    z-index: 1000 !important;
+}

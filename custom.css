@@ -1,0 +1,130 @@
+/* ==================================================
+   CUSTOM OVERRIDES FOR Y-N10 CLONE
+   ================================================== */
+
+/* --------------------------------------------------
+   1. BOTTOM-RIGHT INVESTMENT BUTTON
+   -------------------------------------------------- */
+#container:not(.init) #investmentButton {
+    /* POSITION: Move the button around */
+    bottom: 100px !important;  /* Distance from bottom (was 53px) - increase to move up */
+    right: 50px !important;     /* Distance from right (was 0) - increase to move left */
+
+    /* BACKGROUND COLOR: Change the button's base color */
+    background-color: #2a5f8f !important;  /* Blue */
+    /* Other color options:
+       #8b4789 - Purple
+       #4a7c59 - Green
+       #c74440 - Red
+       #333333 - Dark gray
+       #8b6f47 - Brown
+    */
+}
+
+/* Button hover state */
+#container:not(.init) #investmentButton.hover {
+    background-color: #1a4f7f !important;  /* Darker blue on hover */
+}
+
+/* ANIMATED COLOR BLOCKS on the investment button corners */
+@keyframes bgColorRotation1 {
+    from { background-color: #FF6B9D; }   /* Pink */
+    25%  { background-color: #6B9DFF; }   /* Light blue */
+    50%  { background-color: #9DFF6B; }   /* Light green */
+    75%  { background-color: #FFD76B; }   /* Yellow */
+}
+
+@keyframes bgColorRotation2 {
+    from { background-color: #6B9DFF; }   /* Light blue */
+    25%  { background-color: #9DFF6B; }   /* Light green */
+    50%  { background-color: #FFD76B; }   /* Yellow */
+    75%  { background-color: #FF6B9D; }   /* Pink */
+}
+
+/* HIDE the investment button completely */
+/* Uncomment the line below to remove it: */
+/* #investmentButton { display: none !important; } */
+
+
+/* --------------------------------------------------
+   2. BACKGROUND PIXEL COLORS
+   -------------------------------------------------- */
+/* The twinkling pixels in the background are created by JavaScript.
+   To change their colors, you need to edit the engine.min.js file,
+   OR add this script tag after the </body> tag:
+
+<script>
+// This overrides the pixel colors after the page loads
+window.addEventListener('load', function() {
+    // The pixel colors are defined in the JavaScript
+    // You would need to modify the engine.min.js file
+    // Or inject custom JavaScript to override them
+});
+</script>
+
+The current pixel colors in the original are likely:
+- Blue: #4398cd
+- Red: #d82d17
+- Green: #47a639
+- Yellow: #edcb1f
+
+To change these, you'll need to either:
+A) Edit engine.min.js (advanced - requires unminifying)
+B) Add custom JavaScript to override after page load
+*/
+
+
+/* --------------------------------------------------
+   3. REUSABLE PIXELATED ARROW COMPONENT
+   -------------------------------------------------- */
+/* This is the Y-N10 style pixelated arrow used in buttons.
+
+   HTML usage:
+   <span class="yn10-arrow" aria-hidden="true"></span>
+
+   To change the arrow size, adjust the --p variable (pixel size).
+   Default is 18px, which creates a 90px × 90px arrow (5 × 5 grid).
+
+   Arrow pattern (5×5 grid):
+   Row 0: pixel at column 2
+   Row 1: pixel at column 3
+   Row 2: full row (columns 0-4)
+   Row 3: pixel at column 3
+   Row 4: pixel at column 2
+*/
+
+.yn10-arrow {
+    --p: 18px;  /* Change this to resize the arrow */
+    width: calc(var(--p) * 5);
+    height: calc(var(--p) * 5);
+    position: relative;
+    display: inline-block;
+}
+
+.yn10-arrow::before {
+    content: "";
+    position: absolute;
+    /* Base pixel at (col=2, row=0) */
+    left: calc(var(--p) * 2);
+    top: calc(var(--p) * 0);
+    width: var(--p);
+    height: var(--p);
+    background: #fff;
+    /* Other pixels drawn using box-shadow relative to base */
+    box-shadow:
+        calc(var(--p) * 1) calc(var(--p) * 1) 0 0 #fff,   /* (3,1) */
+        calc(var(--p) * -2) calc(var(--p) * 2) 0 0 #fff,  /* (0,2) */
+        calc(var(--p) * -1) calc(var(--p) * 2) 0 0 #fff,  /* (1,2) */
+        calc(var(--p) * 0) calc(var(--p) * 2) 0 0 #fff,   /* (2,2) */
+        calc(var(--p) * 1) calc(var(--p) * 2) 0 0 #fff,   /* (3,2) */
+        calc(var(--p) * 2) calc(var(--p) * 2) 0 0 #fff,   /* (4,2) */
+        calc(var(--p) * 1) calc(var(--p) * 3) 0 0 #fff,   /* (3,3) */
+        calc(var(--p) * 0) calc(var(--p) * 4) 0 0 #fff;   /* (2,4) */
+}
+
+/* Example: Smaller arrow variant */
+/*
+.yn10-arrow-small {
+    --p: 8px;
+}
+*/
