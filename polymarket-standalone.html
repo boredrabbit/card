@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polymarket Whale Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            color: #fff;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1.5rem 0;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .title {
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .start-all-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: rgba(71, 166, 57, 0.2);
+            border: 1px solid rgba(71, 166, 57, 0.5);
+            padding: 0.75rem 1.5rem;
+            color: #47a639;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .start-all-btn:hover {
+            background: rgba(71, 166, 57, 0.3);
+            border-color: #47a639;
+        }
+
+        .start-all-btn.active {
+            background: rgba(216, 45, 23, 0.2);
+            border-color: rgba(216, 45, 23, 0.5);
+            color: #d82d17;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .start-all-btn.active .status-dot {
+            background: #47a639;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main Layout */
+        .main-layout {
+            display: flex;
+            gap: 1.5rem;
+            align-items: flex-start;
+        }
+
+        .trackers-section {
+            flex: 1;
+        }
+
+        .sidebar {
+            width: 400px;
+            flex-shrink: 0;
+        }
+
+        /* Tracker Grid */
+        .tracker-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .tracker-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .tracker-panel {
+            background: #000;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+        }
+
+        .tracker-panel.active {
+            border-color: rgba(71, 166, 57, 0.3);
+        }
+
+        .tracker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .tracker-name {
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .tracker-toggle {
+            font-size: 0.55rem;
+            padding: 0.35rem 0.75rem;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .tracker-toggle:hover {
+            border-color: rgba(71, 166, 57, 0.5);
+            color: #47a639;
+        }
+
+        .tracker-toggle.active {
+            background: rgba(216, 45, 23, 0.15);
+            border-color: rgba(216, 45, 23, 0.4);
+            color: #d82d17;
+        }
+
+        .tracker-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.5rem;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .tracker-whales {
+            font-size: 0.55rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .empty-tracker {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 0.55rem;
+        }
+
+        /* Whale Alert Feed */
+        .whale-alert-feed {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-height: calc(100vh - 200px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .whale-feed-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        .whale-feed-title {
+            font-size: 0.65rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .whale-count {
+            padding: 0.2rem 0.6rem;
+            background: rgba(247, 147, 26, 0.15);
+            border: 1px solid rgba(247, 147, 26, 0.3);
+            border-radius: 2px;
+            font-size: 0.6rem;
+            color: #f7931a;
+        }
+
+        .whale-alerts-container {
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .whale-alert-item {
+            background: #000;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .whale-alert-item:hover {
+            background: rgba(247, 147, 26, 0.05);
+            border-left: 2px solid #f7931a;
+            padding-left: 1.15rem;
+        }
+
+        .whale-alert-item.high-score {
+            border-left: 2px solid #f7931a;
+        }
+
+        .whale-alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .whale-category-badge {
+            font-size: 0.55rem;
+            padding: 0.2rem 0.5rem;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .whale-score-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            background: rgba(247, 147, 26, 0.15);
+            border: 1px solid rgba(247, 147, 26, 0.4);
+            border-radius: 2px;
+            color: #f7931a;
+        }
+
+        .whale-score-badge.ultra-high {
+            background: rgba(216, 45, 23, 0.2);
+            border-color: rgba(216, 45, 23, 0.6);
+            color: #d82d17;
+        }
+
+        .whale-market-title {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.95);
+            font-weight: 500;
+            line-height: 1.4;
+            margin-bottom: 0.75rem;
+        }
+
+        .whale-bet-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.65rem 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .whale-detail-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .whale-detail-label {
+            font-size: 0.55rem;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .whale-detail-value {
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+        }
+
+        .whale-detail-value.amount {
+            color: #f7931a;
+            font-weight: 600;
+        }
+
+        .whale-wallet-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 0.65rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .whale-wallet {
+            font-size: 0.6rem;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .whale-timestamp {
+            font-size: 0.6rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .no-alerts {
+            padding: 3rem 1.5rem;
+            text-align: center;
+            font-size: 0.6rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Activity Log */
+        .activity-log {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .log-header {
+            font-size: 0.6rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .log-items {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .log-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.55rem;
+        }
+
+        .log-time {
+            color: rgba(255, 255, 255, 0.4);
+            flex-shrink: 0;
+        }
+
+        .log-message {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .log-message.whale {
+            color: #f7931a;
+        }
+
+        .log-message.success {
+            color: #47a639;
+        }
+
+        .log-message.error {
+            color: #d82d17;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">POLYMARKET WHALE MONITOR</h1>
+            <button class="start-all-btn" id="startAllBtn">
+                <span class="status-dot"></span>
+                <span id="startAllText">START ALL</span>
+            </button>
+        </div>
+
+        <div class="main-layout">
+            <div class="trackers-section">
+                <div class="tracker-grid">
+                    <!-- Politics -->
+                    <div class="tracker-panel" data-tracker="politics">
+                        <div class="tracker-header">
+                            <span class="tracker-name">Politics</span>
+                            <button class="tracker-toggle" data-category="politics">
+                                <span class="toggle-text">Start</span>
+                            </button>
+                        </div>
+                        <div class="tracker-stats">
+                            <div class="stat-item">
+                                <div class="stat-label">Count</div>
+                                <div class="stat-value" data-stat="count-politics">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Avg Score</div>
+                                <div class="stat-value" data-stat="score-politics">--</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Volume</div>
+                                <div class="stat-value" data-stat="volume-politics">$0</div>
+                            </div>
+                        </div>
+                        <div class="tracker-whales" data-whales="politics">
+                            <div class="empty-tracker">No whales found</div>
+                        </div>
+                    </div>
+
+                    <!-- Crypto -->
+                    <div class="tracker-panel" data-tracker="crypto">
+                        <div class="tracker-header">
+                            <span class="tracker-name">Crypto</span>
+                            <button class="tracker-toggle" data-category="crypto">
+                                <span class="toggle-text">Start</span>
+                            </button>
+                        </div>
+                        <div class="tracker-stats">
+                            <div class="stat-item">
+                                <div class="stat-label">Count</div>
+                                <div class="stat-value" data-stat="count-crypto">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Avg Score</div>
+                                <div class="stat-value" data-stat="score-crypto">--</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Volume</div>
+                                <div class="stat-value" data-stat="volume-crypto">$0</div>
+                            </div>
+                        </div>
+                        <div class="tracker-whales" data-whales="crypto">
+                            <div class="empty-tracker">No whales found</div>
+                        </div>
+                    </div>
+
+                    <!-- Pop Culture -->
+                    <div class="tracker-panel" data-tracker="popculture">
+                        <div class="tracker-header">
+                            <span class="tracker-name">Pop Culture</span>
+                            <button class="tracker-toggle" data-category="popculture">
+                                <span class="toggle-text">Start</span>
+                            </button>
+                        </div>
+                        <div class="tracker-stats">
+                            <div class="stat-item">
+                                <div class="stat-label">Count</div>
+                                <div class="stat-value" data-stat="count-popculture">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Avg Score</div>
+                                <div class="stat-value" data-stat="score-popculture">--</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Volume</div>
+                                <div class="stat-value" data-stat="volume-popculture">$0</div>
+                            </div>
+                        </div>
+                        <div class="tracker-whales" data-whales="popculture">
+                            <div class="empty-tracker">No whales found</div>
+                        </div>
+                    </div>
+
+                    <!-- Sports -->
+                    <div class="tracker-panel" data-tracker="sports">
+                        <div class="tracker-header">
+                            <span class="tracker-name">Sports</span>
+                            <button class="tracker-toggle" data-category="sports">
+                                <span class="toggle-text">Start</span>
+                            </button>
+                        </div>
+                        <div class="tracker-stats">
+                            <div class="stat-item">
+                                <div class="stat-label">Count</div>
+                                <div class="stat-value" data-stat="count-sports">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Avg Score</div>
+                                <div class="stat-value" data-stat="score-sports">--</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Volume</div>
+                                <div class="stat-value" data-stat="volume-sports">$0</div>
+                            </div>
+                        </div>
+                        <div class="tracker-whales" data-whales="sports">
+                            <div class="empty-tracker">No whales found</div>
+                        </div>
+                    </div>
+
+                    <!-- Business -->
+                    <div class="tracker-panel" data-tracker="business">
+                        <div class="tracker-header">
+                            <span class="tracker-name">Business</span>
+                            <button class="tracker-toggle" data-category="business">
+                                <span class="toggle-text">Start</span>
+                            </button>
+                        </div>
+                        <div class="tracker-stats">
+                            <div class="stat-item">
+                                <div class="stat-label">Count</div>
+                                <div class="stat-value" data-stat="count-business">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Avg Score</div>
+                                <div class="stat-value" data-stat="score-business">--</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Volume</div>
+                                <div class="stat-value" data-stat="volume-business">$0</div>
+                            </div>
+                        </div>
+                        <div class="tracker-whales" data-whales="business">
+                            <div class="empty-tracker">No whales found</div>
+                        </div>
+                    </div>
+
+                    <!-- Science -->
+                    <div class="tracker-panel" data-tracker="science">
+                        <div class="tracker-header">
+                            <span class="tracker-name">Science</span>
+                            <button class="tracker-toggle" data-category="science">
+                                <span class="toggle-text">Start</span>
+                            </button>
+                        </div>
+                        <div class="tracker-stats">
+                            <div class="stat-item">
+                                <div class="stat-label">Count</div>
+                                <div class="stat-value" data-stat="count-science">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Avg Score</div>
+                                <div class="stat-value" data-stat="science-politics">--</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Volume</div>
+                                <div class="stat-value" data-stat="volume-science">$0</div>
+                            </div>
+                        </div>
+                        <div class="tracker-whales" data-whales="science">
+                            <div class="empty-tracker">No whales found</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Log -->
+                <div class="activity-log">
+                    <div class="log-header">Activity Log</div>
+                    <div class="log-items" id="logItems"></div>
+                </div>
+            </div>
+
+            <!-- Whale Alert Feed Sidebar -->
+            <div class="sidebar">
+                <div class="whale-alert-feed">
+                    <div class="whale-feed-header">
+                        <span class="whale-feed-title">WHALE ALERTS</span>
+                        <span class="whale-count" id="whaleAlertCount">0</span>
+                    </div>
+                    <div class="whale-alerts-container" id="whaleAlertsContainer">
+                        <div class="no-alerts">
+                            No whale activity detected yet.<br>Start monitoring categories to see alerts.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Scripts -->
+    <script src="polymarket-api.js"></script>
+    <script src="polymarket-trackers.js"></script>
+    <script>
+        // Initialize
+        console.log('🚀 Initializing Polymarket Whale Monitor...');
+
+        const api = new PolymarketAPI();
+        const trackerSystem = new PolymarketTrackerSystem(api);
+        window.trackerSystem = trackerSystem;
+
+        console.log('✅ Tracker system initialized');
+
+        // Wire up Start All button
+        const startAllBtn = document.getElementById('startAllBtn');
+        const startAllText = document.getElementById('startAllText');
+
+        startAllBtn.addEventListener('click', async () => {
+            console.log('🎯 Start All clicked');
+
+            if (trackerSystem.monitors.size > 0) {
+                console.log('⏸ Stopping all trackers');
+                trackerSystem.stopAll();
+                startAllBtn.classList.remove('active');
+                startAllText.textContent = 'START ALL';
+            } else {
+                console.log('▶ Starting all trackers');
+                await trackerSystem.startAll();
+                startAllBtn.classList.add('active');
+                startAllText.textContent = 'STOP ALL';
+            }
+        });
+
+        // Wire up individual tracker buttons
+        document.querySelectorAll('.tracker-toggle').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const category = btn.dataset.category;
+                console.log(`Toggling ${category} tracker`);
+
+                if (trackerSystem.monitors.has(category)) {
+                    trackerSystem.stopTracker(category);
+                } else {
+                    await trackerSystem.startTracker(category);
+                }
+            });
+        });
+
+        console.log('✅ All event listeners attached');
+    </script>
+</body>
+</html>

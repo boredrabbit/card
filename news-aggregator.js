@@ -20,7 +20,22 @@ class NewsAggregator {
             { handle: 'zerohedge', category: 'markets' },
             { handle: 'WSJ', category: 'markets' },
             { handle: 'Bloomberg', category: 'markets' },
-            { handle: 'business', category: 'markets' }
+            { handle: 'business', category: 'markets' },
+            // Crypto-specific accounts
+            { handle: 'VitalikButerin', category: 'crypto' },
+            { handle: 'cz_binance', category: 'crypto' },
+            { handle: 'APompliano', category: 'crypto' },
+            { handle: 'DocumentingBTC', category: 'crypto' },
+            // TCG/Collectibles accounts
+            { handle: 'PokeBeach', category: 'collectibles' },
+            { handle: 'PokemonTCG', category: 'collectibles' },
+            { handle: 'OnePieceTCGNews', category: 'collectibles' },
+            { handle: 'PrimetimePokemon', category: 'collectibles' },
+            // Polymarket-specific accounts
+            { handle: 'PolymarketHQ', category: 'polymarket' },
+            { handle: 'ThePolymarket', category: 'polymarket' },
+            { handle: 'CalebandBrown', category: 'polymarket' },
+            { handle: 'PredictIt', category: 'polymarket' }
         ];
 
         // Nitter instances (backup mirrors in case one is down)
@@ -171,11 +186,15 @@ class NewsAggregator {
             // MarketWatch
             this.fetchRSSFeed('https://www.marketwatch.com/rss/topstories', 'MarketWatch', 'markets'),
 
-            // Coindesk (crypto specific)
+            // Crypto-specific feeds
             this.fetchRSSFeed('https://www.coindesk.com/arc/outboundfeeds/rss/', 'CoinDesk', 'crypto'),
+            this.fetchRSSFeed('https://www.theblock.co/rss.xml', 'The Block', 'crypto'),
+            this.fetchRSSFeed('https://cointelegraph.com/rss', 'Cointelegraph', 'crypto'),
+            this.fetchRSSFeed('https://decrypt.co/feed', 'Decrypt', 'crypto'),
 
-            // The Block (crypto)
-            this.fetchRSSFeed('https://www.theblock.co/rss.xml', 'The Block', 'crypto')
+            // TCG/Collectibles feeds
+            this.fetchRSSFeed('https://www.pokebeach.com/feed', 'PokeBeach', 'collectibles'),
+            this.fetchRSSFeed('https://www.tcgplayer.com/blog/feed', 'TCGPlayer Blog', 'collectibles')
         );
 
         const results = await Promise.allSettled(promises);
@@ -220,8 +239,33 @@ class NewsAggregator {
      * Start auto-updating news feed
      */
     startAutoUpdate(callback) {
-        // Fetch immediately
-        this.fetchAllNews().then(callback);
+        // Fetch priority accounts FIRST for instant news (fast!)
+        const priorityAccounts = this.twitterAccounts.filter(acc => acc.priority);
+        const priorityPromises = priorityAccounts.map(acc =>
+            this.fetchTwitterAccount(acc.handle, acc.category)
+        );
+
+        Promise.allSettled(priorityPromises).then(results => {
+            const priorityNews = [];
+            results.forEach(result => {
+                if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+                    priorityNews.push(...result.value);
+                }
+            });
+
+            if (priorityNews.length > 0) {
+                priorityNews.sort((a, b) => b.timestamp - a.timestamp);
+                this.newsItems = this.removeDuplicates(priorityNews);
+                console.log(`⚡ Quick load: ${this.newsItems.length} priority news items`);
+                callback(this.newsItems); // INSTANT callback with priority news
+            }
+
+            // Then fetch everything else in background
+            this.fetchAllNews().then(allNews => {
+                console.log(`📰 Full load: ${allNews.length} total news items`);
+                callback(allNews);
+            });
+        });
 
         // Fast polling for priority accounts (every 10 seconds)
         setInterval(async () => {
@@ -268,6 +312,48 @@ class NewsAggregator {
         this.twitterAccounts = this.twitterAccounts.filter(
             account => account.handle !== handle
         );
+    }
+
+    /**
+     * Filter news by category
+     * @param {string} category - 'all', 'crypto', 'stocks', 'collectibles', 'polymarket'
+     * @returns {Array} Filtered news items
+     */
+    filterByCategory(category) {
+        if (category === 'all') {
+            return this.newsItems;
+        }
+
+        return this.newsItems.filter(item => {
+            // Direct category match
+            if (item.category === category) {
+                return true;
+            }
+
+            // For stocks category, include general markets news
+            if (category === 'stocks' && (item.category === 'markets' || item.category === 'breaking')) {
+                return true;
+            }
+
+            // For crypto, only show crypto-specific news
+            if (category === 'crypto' && item.category === 'crypto') {
+                return true;
+            }
+
+            // For collectibles, only show collectibles news
+            if (category === 'collectibles' && item.category === 'collectibles') {
+                return true;
+            }
+
+            // For polymarket, show polymarket + general markets/breaking news
+            if (category === 'polymarket') {
+                return item.category === 'polymarket' ||
+                       item.category === 'markets' ||
+                       item.category === 'breaking';
+            }
+
+            return false;
+        });
     }
 }
 
