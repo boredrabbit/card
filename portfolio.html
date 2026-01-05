@@ -3018,6 +3018,7 @@
             <button class="tab" data-category="stocks">Stocks</button>
             <button class="tab" data-category="collectibles">Collectibles</button>
             <button class="tab" data-category="polymarket">Polymarket</button>
+            <button class="tab" data-category="holdings">Holdings</button>
         </div>
 
         <!-- Portfolio Grid -->
@@ -3259,6 +3260,143 @@
                 </div>
             </div>
 
+            <!-- Holdings Snapshot View -->
+            <div id="holdingsView" data-category="holdings" style="display: none;">
+                <!-- Auto-Sync Login Section -->
+                <div id="robinhoodLoginSection" style="margin-bottom: 2rem; padding: 1.5rem; background: rgba(71, 166, 57, 0.1); border: 1px solid rgba(71, 166, 57, 0.3);">
+                    <h2 style="font-size: 1rem; font-weight: 500; letter-spacing: 0.15em; margin-bottom: 0.5rem; color: #47a639;">🔐 AUTO-SYNC LOGIN</h2>
+                    <p style="font-size: 0.7rem; color: rgba(255, 255, 255, 0.5); margin-bottom: 1rem; line-height: 1.5;">
+                        Connect your Robinhood account to enable automatic syncing every 5 minutes.
+                    </p>
+
+                    <!-- Credentials Saved Indicator -->
+                    <div id="credentialsSavedIndicator" style="display: none; background: rgba(71, 166, 57, 0.15); border: 1px solid rgba(71, 166, 57, 0.4); padding: 0.75rem; margin-bottom: 1rem; font-size: 0.7rem;">
+                        ✅ <span style="color: #47a639;">Credentials saved and auto-sync enabled!</span>
+                        <button id="clearStoredCredentials" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); padding: 0.3rem 0.75rem; margin-left: 1rem; color: rgba(255, 255, 255, 0.7); font-size: 0.65rem; cursor: pointer;">
+                            Clear Credentials
+                        </button>
+                    </div>
+
+                    <!-- Login Form -->
+                    <div id="robinhoodLoginForm">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div>
+                                <label style="display: block; font-size: 0.65rem; color: rgba(255, 255, 255, 0.6); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.1em;">Email</label>
+                                <input type="email" id="rhUsername" placeholder="your_email@example.com" style="
+                                    width: 100%;
+                                    background: rgba(0, 0, 0, 0.5);
+                                    border: 1px solid rgba(255, 255, 255, 0.2);
+                                    color: #fff;
+                                    padding: 0.75rem;
+                                    font-family: inherit;
+                                    font-size: 0.75rem;
+                                ">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.65rem; color: rgba(255, 255, 255, 0.6); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.1em;">Password</label>
+                                <input type="password" id="rhPassword" placeholder="••••••••" style="
+                                    width: 100%;
+                                    background: rgba(0, 0, 0, 0.5);
+                                    border: 1px solid rgba(255, 255, 255, 0.2);
+                                    color: #fff;
+                                    padding: 0.75rem;
+                                    font-family: inherit;
+                                    font-size: 0.75rem;
+                                ">
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+                            <input type="checkbox" id="saveCredentials" checked style="width: auto;">
+                            <label for="saveCredentials" style="font-size: 0.7rem; color: rgba(255, 255, 255, 0.6); margin: 0;">
+                                Save credentials for auto-sync
+                            </label>
+                        </div>
+
+                        <div style="display: flex; gap: 1rem;">
+                            <button id="testRobinhoodLogin" style="
+                                background: #47a639;
+                                border: none;
+                                padding: 0.75rem 1.5rem;
+                                color: #fff;
+                                font-size: 0.7rem;
+                                letter-spacing: 0.1em;
+                                text-transform: uppercase;
+                                cursor: pointer;
+                                transition: all 0.2s;
+                                font-family: inherit;
+                            ">
+                                🔐 TEST & SAVE
+                            </button>
+                            <button id="sendToSyncServer" style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border: 1px solid rgba(255, 255, 255, 0.2);
+                                padding: 0.75rem 1.5rem;
+                                color: rgba(255, 255, 255, 0.7);
+                                font-size: 0.7rem;
+                                letter-spacing: 0.1em;
+                                text-transform: uppercase;
+                                cursor: pointer;
+                                transition: all 0.2s;
+                                font-family: inherit;
+                            ">
+                                📡 SEND TO SERVER
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Status Message -->
+                    <div id="rhLoginStatus" style="display: none; margin-top: 1rem; padding: 0.75rem; font-size: 0.7rem;"></div>
+
+                    <!-- Security Warning -->
+                    <div style="background: rgba(255, 165, 0, 0.1); border: 1px solid rgba(255, 165, 0, 0.3); padding: 0.75rem; margin-top: 1rem; font-size: 0.65rem; line-height: 1.6;">
+                        <strong>⚠️ Security Notice:</strong> Credentials stored locally in browser (base64 encoded).
+                        Uses unofficial Robinhood API. 2FA must be disabled. <a href="WEB_LOGIN_GUIDE.md" target="_blank" style="color: #47a639;">Read security guide</a>
+                    </div>
+                </div>
+
+                <!-- Manual Snapshot Section -->
+                <div style="margin-bottom: 2rem; padding: 1.5rem; background: rgba(71, 166, 57, 0.1); border: 1px solid rgba(71, 166, 57, 0.3);">
+                    <h2 style="font-size: 1rem; font-weight: 500; letter-spacing: 0.15em; margin-bottom: 1rem; color: #47a639;">📸 MANUAL SNAPSHOT</h2>
+                    <p style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.6); margin-bottom: 1rem; line-height: 1.6;">
+                        Or create a manual snapshot without connecting your account. More secure, requires manual updates.
+                    </p>
+                    <div style="display: flex; gap: 1rem;">
+                        <button id="openSnapshotTool" style="
+                            background: rgba(71, 166, 57, 0.2);
+                            border: 1px solid rgba(71, 166, 57, 0.5);
+                            padding: 0.75rem 1.5rem;
+                            color: #47a639;
+                            font-size: 0.7rem;
+                            letter-spacing: 0.1em;
+                            text-transform: uppercase;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                            font-family: inherit;
+                        ">
+                            📸 CREATE/UPDATE SNAPSHOT
+                        </button>
+                        <button id="refreshHoldings" style="
+                            background: rgba(255, 255, 255, 0.05);
+                            border: 1px solid rgba(255, 255, 255, 0.2);
+                            padding: 0.75rem 1.5rem;
+                            color: rgba(255, 255, 255, 0.7);
+                            font-size: 0.7rem;
+                            letter-spacing: 0.1em;
+                            text-transform: uppercase;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                            font-family: inherit;
+                        ">
+                            🔄 REFRESH
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Holdings Table -->
+                <div id="holdingsTable"></div>
+            </div>
+
     <!-- News Feed Sidebar -->
     <div class="news-feed" id="newsFeed">
         <div class="resize-handle news-resize-handle" id="newsResizeHandle"></div>
@@ -3423,6 +3561,9 @@
 
     <!-- Price Fetcher Script -->
     <script src="price-fetcher.js"></script>
+
+    <!-- Holdings Manager Script -->
+    <script src="holdings-manager.js"></script>
 
     <!-- Polymarket API Script -->
     <script src="polymarket-api.js"></script>
@@ -3650,6 +3791,8 @@
                 }
 
                 // Handle Polymarket launcher visibility
+                const holdingsView = document.getElementById('holdingsView');
+
                 if (category === 'polymarket') {
                     // Hide all asset cards using CSS class - keeps TradingView iframes rendering
                     cards.forEach(card => {
@@ -3659,10 +3802,34 @@
                     if (polymarketLauncher) {
                         polymarketLauncher.style.display = 'block';
                     }
+                    if (holdingsView) {
+                        holdingsView.style.display = 'none';
+                    }
+                } else if (category === 'holdings') {
+                    // Hide all asset cards
+                    cards.forEach(card => {
+                        card.classList.add('hidden-card');
+                    });
+                    // Hide Polymarket launcher
+                    if (polymarketLauncher) {
+                        polymarketLauncher.style.display = 'none';
+                    }
+                    // Show Holdings view
+                    if (holdingsView) {
+                        holdingsView.style.display = 'block';
+                        // Render holdings table
+                        if (typeof window.holdingsManager !== 'undefined') {
+                            window.holdingsManager.renderTable('holdingsTable');
+                        }
+                    }
                 } else {
                     // Hide Polymarket launcher
                     if (polymarketLauncher) {
                         polymarketLauncher.style.display = 'none';
+                    }
+                    // Hide Holdings view
+                    if (holdingsView) {
+                        holdingsView.style.display = 'none';
                     }
                     // Filter cards - keep TradingView charts rendering by using CSS class
                     cards.forEach(card => {
@@ -5229,6 +5396,210 @@
         }
 
         console.log('✅ Real Polymarket whale tracker initialized');
+
+        // ========================================
+        // Holdings Manager Initialization
+        // ========================================
+
+        // Initialize holdings manager
+        window.holdingsManager = new HoldingsManager();
+        console.log('📊 Holdings Manager initialized');
+
+        // Button: Open snapshot tool
+        document.getElementById('openSnapshotTool')?.addEventListener('click', () => {
+            window.open('robinhood-snapshot.html', '_blank', 'width=1200,height=800');
+        });
+
+        // Button: Refresh holdings
+        document.getElementById('refreshHoldings')?.addEventListener('click', () => {
+            if (window.holdingsManager) {
+                window.holdingsManager.loadSnapshot();
+                window.holdingsManager.renderTable('holdingsTable');
+                console.log('🔄 Holdings refreshed');
+            }
+        });
+
+        // Robinhood Auto-Sync Login Functionality
+        const STORAGE_KEY = 'robinhood_credentials';
+        const SYNC_SERVER = 'http://localhost:3002';
+
+        // Check if credentials are already stored
+        function checkStoredCredentials() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    const creds = JSON.parse(atob(stored));
+                    document.getElementById('credentialsSavedIndicator').style.display = 'block';
+                    document.getElementById('rhUsername').value = creds.username;
+                    return true;
+                } catch (error) {
+                    console.error('Error loading credentials:', error);
+                }
+            }
+            return false;
+        }
+
+        // Save credentials to localStorage (base64 encoded)
+        function saveCredentials(username, password) {
+            const data = btoa(JSON.stringify({
+                username: username,
+                password: password,
+                savedAt: new Date().toISOString()
+            }));
+            localStorage.setItem(STORAGE_KEY, data);
+            console.log('✅ Credentials saved to localStorage');
+        }
+
+        // Clear stored credentials
+        function clearCredentials() {
+            localStorage.removeItem(STORAGE_KEY);
+            document.getElementById('credentialsSavedIndicator').style.display = 'none';
+            document.getElementById('rhUsername').value = '';
+            document.getElementById('rhPassword').value = '';
+            showRHStatus('Credentials cleared', 'success');
+        }
+
+        // Show status message
+        function showRHStatus(message, type = 'loading') {
+            const statusEl = document.getElementById('rhLoginStatus');
+            statusEl.textContent = message;
+            statusEl.style.display = 'block';
+
+            // Set colors based on type
+            if (type === 'success') {
+                statusEl.style.background = 'rgba(71, 166, 57, 0.1)';
+                statusEl.style.border = '1px solid rgba(71, 166, 57, 0.3)';
+                statusEl.style.color = '#47a639';
+            } else if (type === 'error') {
+                statusEl.style.background = 'rgba(216, 45, 23, 0.1)';
+                statusEl.style.border = '1px solid rgba(216, 45, 23, 0.3)';
+                statusEl.style.color = '#d82d17';
+            } else {
+                statusEl.style.background = 'rgba(255, 255, 255, 0.05)';
+                statusEl.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+                statusEl.style.color = 'rgba(255, 255, 255, 0.6)';
+            }
+        }
+
+        // Test connection to Robinhood
+        async function testConnection(username, password) {
+            showRHStatus('🔐 Testing connection to Robinhood...', 'loading');
+
+            try {
+                const response = await fetch(`${SYNC_SERVER}/api/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Login failed');
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('Login error:', error);
+                throw error;
+            }
+        }
+
+        // Send credentials to sync server
+        async function sendToSyncServer(username, password) {
+            showRHStatus('📡 Sending credentials to sync server...', 'loading');
+
+            try {
+                const response = await fetch(`${SYNC_SERVER}/api/set-credentials`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to send credentials');
+                }
+
+                showRHStatus('✅ Credentials sent! Auto-sync started.', 'success');
+                return true;
+            } catch (error) {
+                showRHStatus(`❌ Error: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // Test & Save button
+        document.getElementById('testRobinhoodLogin')?.addEventListener('click', async () => {
+            const username = document.getElementById('rhUsername').value;
+            const password = document.getElementById('rhPassword').value;
+            const shouldSave = document.getElementById('saveCredentials').checked;
+
+            if (!username || !password) {
+                showRHStatus('❌ Please enter both email and password', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('testRobinhoodLogin');
+            btn.disabled = true;
+            btn.textContent = 'TESTING...';
+
+            try {
+                // Test the connection
+                await testConnection(username, password);
+
+                // If successful, save credentials if requested
+                if (shouldSave) {
+                    saveCredentials(username, password);
+                    document.getElementById('credentialsSavedIndicator').style.display = 'block';
+                }
+
+                showRHStatus('✅ Connection successful! Credentials saved.', 'success');
+
+                // Also send to sync server
+                await sendToSyncServer(username, password);
+
+            } catch (error) {
+                showRHStatus(`❌ Login failed: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔐 TEST & SAVE';
+            }
+        });
+
+        // Send to Server button
+        document.getElementById('sendToSyncServer')?.addEventListener('click', async () => {
+            const username = document.getElementById('rhUsername').value;
+            const password = document.getElementById('rhPassword').value;
+
+            if (!username || !password) {
+                showRHStatus('❌ Please enter both email and password', 'error');
+                return;
+            }
+
+            await sendToSyncServer(username, password);
+        });
+
+        // Clear Credentials button
+        document.getElementById('clearStoredCredentials')?.addEventListener('click', clearCredentials);
+
+        // Check for stored credentials on page load
+        checkStoredCredentials();
+
+        // Listen for storage events (when snapshot is updated in another tab)
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'portfolio_holdings_snapshot') {
+                console.log('📦 Holdings snapshot updated in another tab');
+                if (window.holdingsManager) {
+                    window.holdingsManager.loadSnapshot();
+                    // Re-render if holdings tab is currently visible
+                    const holdingsView = document.getElementById('holdingsView');
+                    if (holdingsView && holdingsView.style.display !== 'none') {
+                        window.holdingsManager.renderTable('holdingsTable');
+                    }
+                }
+            }
+        });
+
+        console.log('✅ Holdings Manager ready');
     </script>
 
     <!-- CRITICAL FIX: Force correct alignment - loaded last to override everything -->
