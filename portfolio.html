@@ -3308,7 +3308,7 @@
             </div>
 
             <div class="price-display">
-                <div class="price-current" id="priceCurrent">Loading...</div>
+                <div class="price-current" id="priceCurrent">--</div>
                 <div class="price-change" id="priceChange">--</div>
             </div>
 
@@ -3756,29 +3756,32 @@
             window.priceData = []; // Make globally accessible for price fetcher
             window.maxDataPoints = 60; // Last 60 updates
 
-            // Try to load last known price from localStorage (only if recent)
+            // Try to load last known price from localStorage (ALWAYS show it, even if old)
             try {
                 const savedPrice = localStorage.getItem('btc_last_price');
                 const savedTimestamp = localStorage.getItem('btc_last_price_timestamp');
 
-                if (savedPrice && savedTimestamp) {
-                    const age = Date.now() - parseInt(savedTimestamp);
-                    // Only use cached price if less than 5 minutes old
-                    if (age < 5 * 60 * 1000) {
-                        const price = parseFloat(savedPrice);
-                        console.log('📂 Loaded last known BTC price from storage:', price, `(${Math.floor(age/1000)}s old)`);
-                        // Initialize chart with saved price
-                        for (let i = 0; i < window.maxDataPoints; i++) {
-                            window.priceData.push(price);
-                        }
-                        // Update display immediately
-                        if (priceValue) priceValue.textContent = priceFetcher.formatPrice(price, 'BTC');
-                        if (priceHigh) priceHigh.textContent = priceFetcher.formatPrice(price, 'BTC');
-                        if (priceLow) priceLow.textContent = priceFetcher.formatPrice(price, 'BTC');
-                    } else {
-                        console.log('⏰ Cached price too old, waiting for fresh data');
-                        localStorage.removeItem('btc_last_price');
-                        localStorage.removeItem('btc_last_price_timestamp');
+                if (savedPrice) {
+                    const price = parseFloat(savedPrice);
+                    const age = savedTimestamp ? Date.now() - parseInt(savedTimestamp) : 0;
+                    const ageMinutes = Math.floor(age / 60000);
+
+                    console.log('📂 Loaded cached BTC price:', price, savedTimestamp ? `(${ageMinutes}m old)` : '(unknown age)');
+
+                    // ALWAYS use cached price to avoid "Loading..." - better to show stale data than nothing
+                    // Initialize chart with saved price
+                    for (let i = 0; i < window.maxDataPoints; i++) {
+                        window.priceData.push(price);
+                    }
+                    // Update display immediately
+                    if (priceValue) priceValue.textContent = priceFetcher.formatPrice(price, 'BTC');
+                    if (priceHigh) priceHigh.textContent = priceFetcher.formatPrice(price, 'BTC');
+                    if (priceLow) priceLow.textContent = priceFetcher.formatPrice(price, 'BTC');
+
+                    // Add indicator if data is old (>5 minutes)
+                    if (age > 5 * 60 * 1000 && priceChange) {
+                        priceChange.textContent = '(cached)';
+                        priceChange.style.color = 'rgba(255, 255, 255, 0.3)';
                     }
                 }
             } catch (error) {
