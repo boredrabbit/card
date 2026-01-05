@@ -3783,6 +3783,11 @@
                         priceChange.textContent = '(cached)';
                         priceChange.style.color = 'rgba(255, 255, 255, 0.3)';
                     }
+                } else {
+                    // No cached price - show loading state
+                    console.log('⏳ No cached price found, waiting for first fetch...');
+                    if (priceValue) priceValue.textContent = 'Loading...';
+                    if (priceChange) priceChange.textContent = 'fetching';
                 }
             } catch (error) {
                 console.warn('Could not load saved price:', error);
