@@ -953,7 +953,7 @@
         /* Mobile landscape and portrait */
         @media (max-width: 768px) {
             .monitor-container {
-                grid-template-rows: 36px 1fr auto;
+                grid-template-rows: 36px 1fr;
                 grid-template-columns: 1fr;
                 height: 100vh;
                 height: 100dvh; /* Dynamic viewport height for mobile browsers */
@@ -961,8 +961,8 @@
 
             /* Status bar mobile */
             .status-bar {
-                padding: 0 10px;
-                font-size: 9px;
+                padding: 0 12px;
+                font-size: 10px;
                 letter-spacing: 0.5px;
             }
 
@@ -970,113 +970,72 @@
                 gap: 6px;
             }
 
-            .status-item span:not(.status-indicator) {
-                display: none;
-            }
-
-            .status-item:first-child span:not(.status-indicator) {
-                display: inline;
-            }
-
-            /* Map takes most of the screen */
+            /* Hide map completely on mobile */
             .map-container {
-                border-right: none;
-                border-bottom: 1px solid var(--border);
-                min-height: 50vh;
+                display: none !important;
             }
 
-            /* Feed sidebar becomes bottom drawer */
+            /* Hide map-related UI elements */
+            .map-legend,
+            .zoom-controls,
+            .map-tooltip {
+                display: none !important;
+            }
+
+            /* Feed becomes full-screen live monitor */
             .feed-sidebar {
                 border-left: none;
-                border-top: 1px solid var(--border);
-                max-height: 35vh;
+                border-top: none;
+                max-height: none;
+                height: 100%;
                 overflow-y: auto;
             }
 
             .feed-header {
-                padding: 10px;
-                font-size: 9px;
+                padding: 12px 15px;
+                font-size: 10px;
                 position: sticky;
                 top: 0;
                 background: var(--bg-panel);
                 z-index: 10;
+                border-bottom: 1px solid var(--border);
             }
 
             .feed-items {
-                padding: 8px;
+                padding: 10px;
             }
 
             .feed-item {
-                margin-bottom: 10px;
-                padding: 8px;
-                font-size: 10px;
+                margin-bottom: 12px;
+                padding: 12px;
+                font-size: 12px;
+                line-height: 1.6;
             }
 
             .feed-time {
-                font-size: 8px;
+                font-size: 10px;
             }
 
             .feed-source {
-                font-size: 7px;
-                padding: 2px 4px;
-            }
-
-            /* Data panel adjustments */
-            .data-panel-content {
-                grid-template-columns: repeat(2, 1fr);
-                padding: 8px;
-                gap: 4px;
-            }
-
-            .data-metric {
-                padding: 8px;
-            }
-
-            .metric-label {
-                font-size: 8px;
-            }
-
-            .metric-value {
-                font-size: 14px;
-            }
-
-            /* Tooltip mobile */
-            .map-tooltip {
-                font-size: 10px;
-                max-width: 250px;
-            }
-
-            /* Legend mobile */
-            .map-legend {
-                bottom: 8px;
-                left: 8px;
-                padding: 8px;
-                font-size: 8px;
-                max-width: 140px;
-            }
-
-            .legend-item {
-                margin-bottom: 4px;
-            }
-
-            /* Zoom controls mobile */
-            .zoom-controls {
-                top: 8px;
-                right: 8px;
-            }
-
-            .zoom-btn {
-                width: 32px;
-                height: 32px;
-                font-size: 16px;
-            }
-
-            /* Theme toggle mobile */
-            .theme-toggle {
-                top: 8px;
-                left: 8px;
-                padding: 6px 10px;
                 font-size: 9px;
+                padding: 3px 6px;
+            }
+
+            /* Data panel - hide on mobile for cleaner look */
+            .data-panel {
+                display: none;
+            }
+
+            /* Theme toggle mobile - move to header area */
+            .theme-toggle {
+                position: fixed;
+                top: auto;
+                bottom: 15px;
+                right: 15px;
+                left: auto;
+                padding: 10px 14px;
+                font-size: 10px;
+                z-index: 50;
             }
 
             /* Anomaly alert mobile */
@@ -1144,23 +1103,21 @@
             }
         }
 
-        /* Landscape mode on mobile */
+        /* Landscape mode on mobile - still hide map, full feed */
         @media (max-width: 768px) and (orientation: landscape) {
             .monitor-container {
                 grid-template-rows: 32px 1fr;
-                grid-template-columns: 1fr 280px;
-            }
-
-            .map-container {
-                min-height: auto;
-                border-bottom: none;
-                border-right: 1px solid var(--border);
+                grid-template-columns: 1fr;
             }
 
             .feed-sidebar {
-                max-height: none;
-                border-top: none;
-                border-left: 1px solid var(--border);
+                height: 100%;
+            }
+
+            .feed-item {
+                font-size: 11px;
+                padding: 10px;
+                margin-bottom: 8px;
             }
         }
 
