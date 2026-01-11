@@ -316,6 +316,221 @@
             opacity: 0.7;
         }
 
+        /* Feed item expand/collapse states */
+        .feed-item {
+            cursor: pointer;
+            position: relative;
+        }
+
+        .feed-item.faded {
+            opacity: 0.25;
+            transform: scale(0.98);
+            pointer-events: none;
+        }
+
+        .feed-item.expanded {
+            background: rgba(var(--primary-rgb), 0.08);
+            border-left-width: 3px;
+            margin-bottom: 20px;
+        }
+
+        .feed-item.expanded.alert {
+            background: rgba(var(--alert-rgb), 0.1);
+        }
+
+        .feed-item.expanded.warning {
+            background: rgba(var(--warning-rgb), 0.08);
+        }
+
+        /* Feed headline - clickable title */
+        .feed-headline {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        /* Expanded content container */
+        .feed-expanded {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            animation: expandIn 0.3s ease-out;
+        }
+
+        .feed-item.expanded .feed-expanded {
+            display: block;
+        }
+
+        @keyframes expandIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Summary text */
+        .feed-summary {
+            font-size: 11px;
+            line-height: 1.6;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+
+        /* Intel data grid */
+        .feed-intel-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .feed-intel-item {
+            background: rgba(var(--primary-rgb), 0.03);
+            padding: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .feed-intel-label {
+            font-size: 8px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 3px;
+        }
+
+        .feed-intel-value {
+            font-size: 11px;
+            color: var(--primary);
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Confidence indicator */
+        .feed-confidence {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .confidence-bar {
+            display: flex;
+            gap: 2px;
+        }
+
+        .confidence-segment {
+            width: 12px;
+            height: 4px;
+            background: var(--border);
+        }
+
+        .confidence-segment.filled {
+            background: var(--primary);
+        }
+
+        .confidence-segment.filled.high {
+            background: var(--alert);
+        }
+
+        .confidence-label {
+            font-size: 9px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Source links */
+        .feed-sources {
+            margin-bottom: 12px;
+        }
+
+        .feed-sources-title {
+            font-size: 8px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .feed-source-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: var(--primary-dim);
+            text-decoration: none;
+            padding: 4px 8px;
+            margin-right: 6px;
+            margin-bottom: 4px;
+            background: rgba(var(--primary-rgb), 0.05);
+            border: 1px solid var(--border);
+            transition: all 0.15s ease;
+        }
+
+        .feed-source-link:hover {
+            background: rgba(var(--primary-rgb), 0.1);
+            border-color: var(--primary-dim);
+            color: var(--primary);
+        }
+
+        .feed-source-icon {
+            font-size: 12px;
+        }
+
+        /* Related items */
+        .feed-related {
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+
+        .feed-related-title {
+            font-size: 8px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .feed-related-item {
+            font-size: 10px;
+            color: var(--text-dim);
+            padding: 4px 0;
+            cursor: pointer;
+            transition: color 0.15s ease;
+        }
+
+        .feed-related-item:hover {
+            color: var(--primary);
+        }
+
+        .feed-related-item::before {
+            content: '└─ ';
+            opacity: 0.5;
+        }
+
+        /* Timestamp details */
+        .feed-time-details {
+            font-size: 9px;
+            color: var(--text-dim);
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Close hint */
+        .feed-close-hint {
+            font-size: 8px;
+            color: var(--text-dim);
+            text-align: center;
+            margin-top: 8px;
+            opacity: 0.5;
+        }
+
         /* Submarine Intel Panel - Dark, minimal style */
         .submarine-intel-panel {
             position: fixed;
@@ -1046,6 +1261,69 @@
             .feed-source {
                 font-size: 10px;
                 padding: 4px 8px;
+            }
+
+            /* Expanded feed item mobile styles */
+            .feed-item.expanded {
+                margin-bottom: 16px;
+            }
+
+            .feed-expanded {
+                margin-top: 14px;
+                padding-top: 14px;
+            }
+
+            .feed-summary {
+                font-size: 12px;
+                line-height: 1.7;
+            }
+
+            .feed-intel-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+            }
+
+            .feed-intel-item {
+                padding: 10px;
+            }
+
+            .feed-intel-label {
+                font-size: 9px;
+            }
+
+            .feed-intel-value {
+                font-size: 12px;
+            }
+
+            .feed-source-link {
+                font-size: 11px;
+                padding: 6px 10px;
+                margin-bottom: 6px;
+            }
+
+            .feed-related-item {
+                font-size: 11px;
+                padding: 6px 0;
+            }
+
+            .feed-time-details {
+                font-size: 10px;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .feed-close-hint {
+                font-size: 9px;
+                margin-top: 12px;
+            }
+
+            .confidence-segment {
+                width: 16px;
+                height: 5px;
+            }
+
+            .confidence-label {
+                font-size: 10px;
             }
 
             /* Theme toggle mobile - bottom right, edge aligned */
@@ -1962,6 +2240,194 @@
             }
         }
 
+        // Currently expanded feed item
+        let expandedFeedItem = null;
+
+        // Generate enriched intel data for feed items
+        function generateEnrichedData(text, type, source, location) {
+            const enrichedData = {
+                summary: '',
+                intel: [],
+                confidence: 0,
+                sources: [],
+                related: [],
+                firstReported: null,
+                lastUpdated: null
+            };
+
+            // Skip enrichment for system messages
+            if (source === 'SYSTEM') {
+                return null;
+            }
+
+            // Generate contextual summary based on content
+            const textLower = text.toLowerCase();
+
+            if (textLower.includes('naval') || textLower.includes('vessel') || textLower.includes('ship')) {
+                enrichedData.summary = 'Maritime intelligence indicates significant naval activity in the region. Multiple OSINT sources corroborate vessel movements consistent with heightened operational tempo.';
+                enrichedData.intel = [
+                    { label: 'Vessel Class', value: getRandomItem(['DESTROYER', 'FRIGATE', 'CARRIER', 'SUBMARINE', 'PATROL']) },
+                    { label: 'Speed', value: Math.floor(Math.random() * 25 + 5) + ' KTS' },
+                    { label: 'Heading', value: Math.floor(Math.random() * 360) + '°' },
+                    { label: 'Flag State', value: getRandomItem(['RU', 'CN', 'US', 'IR', 'KP']) }
+                ];
+                enrichedData.sources = [
+                    { name: 'MarineTraffic', icon: '🚢', url: 'https://marinetraffic.com' },
+                    { name: 'VesselFinder', icon: '📡', url: 'https://vesselfinder.com' }
+                ];
+                enrichedData.confidence = Math.floor(Math.random() * 3) + 3;
+            } else if (textLower.includes('aircraft') || textLower.includes('flight') || textLower.includes('airspace')) {
+                enrichedData.summary = 'Aerial surveillance detected unusual flight patterns. Aircraft transponder data cross-referenced with known military callsigns and flight corridors.';
+                enrichedData.intel = [
+                    { label: 'Aircraft', value: getRandomItem(['IL-76', 'TU-95', 'B-52H', 'E-3 AWACS', 'RC-135']) },
+                    { label: 'Altitude', value: Math.floor(Math.random() * 35000 + 15000) + ' FT' },
+                    { label: 'Callsign', value: getRandomItem(['DUKE', 'IRON', 'VIPER', 'COBRA']) + Math.floor(Math.random() * 99) },
+                    { label: 'Squawk', value: Math.floor(Math.random() * 7000 + 1000).toString() }
+                ];
+                enrichedData.sources = [
+                    { name: 'ADS-B Exchange', icon: '✈️', url: 'https://globe.adsbexchange.com' },
+                    { name: 'FlightRadar24', icon: '📍', url: 'https://flightradar24.com' }
+                ];
+                enrichedData.confidence = Math.floor(Math.random() * 2) + 4;
+            } else if (textLower.includes('nuclear') || textLower.includes('ssbn') || textLower.includes('☢')) {
+                enrichedData.summary = 'Strategic nuclear asset movement detected. Pattern analysis indicates possible deterrence posturing or routine patrol rotation. High priority intelligence.';
+                enrichedData.intel = [
+                    { label: 'Asset Type', value: getRandomItem(['SSBN', 'ICBM', 'BOMBER', 'MOBILE TEL']) },
+                    { label: 'Status', value: getRandomItem(['DEPLOYED', 'TRANSIT', 'ON STATION', 'RTB']) },
+                    { label: 'Threat Level', value: type === 'alert' ? 'ELEVATED' : 'NOMINAL' },
+                    { label: 'Nation', value: getRandomItem(['RUSSIA', 'CHINA', 'USA', 'UK', 'FRANCE']) }
+                ];
+                enrichedData.sources = [
+                    { name: 'NukeMap', icon: '☢️', url: 'https://nuclearsecrecy.com/nukemap/' },
+                    { name: 'FAS Nuclear', icon: '⚛️', url: 'https://fas.org/issues/nuclear-weapons/' }
+                ];
+                enrichedData.confidence = Math.floor(Math.random() * 2) + 2;
+            } else if (textLower.includes('conflict') || textLower.includes('strike') || textLower.includes('attack') || textLower.includes('explosion')) {
+                enrichedData.summary = 'Combat activity reported in active conflict zone. Casualty estimates pending verification. Multiple ground sources confirm kinetic engagement.';
+                enrichedData.intel = [
+                    { label: 'Incident Type', value: getRandomItem(['ARTILLERY', 'AIRSTRIKE', 'DRONE', 'IED', 'MISSILE']) },
+                    { label: 'Casualties', value: getRandomItem(['UNCONFIRMED', '1-5 EST', '5-10 EST', 'MASS CAS']) },
+                    { label: 'Infrastructure', value: getRandomItem(['MILITARY', 'CIVILIAN', 'DUAL-USE', 'CRITICAL']) },
+                    { label: 'Verification', value: getRandomItem(['PENDING', 'PARTIAL', 'MULTI-SRC']) }
+                ];
+                enrichedData.sources = [
+                    { name: 'LiveUA Map', icon: '🗺️', url: 'https://liveuamap.com' },
+                    { name: 'ISW', icon: '📊', url: 'https://understandingwar.org' },
+                    { name: 'Telegram OSINT', icon: '📱', url: '#' }
+                ];
+                enrichedData.confidence = Math.floor(Math.random() * 3) + 2;
+            } else if (textLower.includes('shipping') || textLower.includes('maritime') || textLower.includes('lane') || textLower.includes('chokepoint')) {
+                enrichedData.summary = 'Maritime shipping intelligence update. Commercial traffic patterns analyzed for anomalies. Risk assessment updated based on regional threat indicators.';
+                enrichedData.intel = [
+                    { label: 'Route', value: getRandomItem(['SUEZ', 'HORMUZ', 'MALACCA', 'BOSPORUS', 'PANAMA']) },
+                    { label: 'Risk Level', value: type === 'alert' ? 'HIGH' : type === 'warning' ? 'MODERATE' : 'LOW' },
+                    { label: 'Traffic', value: Math.floor(Math.random() * 50 + 10) + ' VESSELS/DAY' },
+                    { label: 'Delays', value: getRandomItem(['NONE', '+2-4 HRS', '+6-12 HRS', '+24 HRS']) }
+                ];
+                enrichedData.sources = [
+                    { name: 'Lloyd\'s List', icon: '📰', url: 'https://lloydslist.com' },
+                    { name: 'MarineTraffic', icon: '🚢', url: 'https://marinetraffic.com' }
+                ];
+                enrichedData.confidence = Math.floor(Math.random() * 2) + 4;
+            } else if (textLower.includes('troop') || textLower.includes('military') || textLower.includes('deployment') || textLower.includes('exercise')) {
+                enrichedData.summary = 'Ground force movements detected via satellite imagery and social media GEOINT. Unit identification pending further analysis of vehicle markings and equipment.';
+                enrichedData.intel = [
+                    { label: 'Unit Type', value: getRandomItem(['ARMOR', 'INFANTRY', 'ARTILLERY', 'AIR DEFENSE', 'LOGISTICS']) },
+                    { label: 'Size', value: getRandomItem(['PLATOON', 'COMPANY', 'BATTALION', 'BRIGADE']) },
+                    { label: 'Movement', value: getRandomItem(['STATIC', 'ADVANCING', 'RETREATING', 'FLANKING']) },
+                    { label: 'Equipment', value: Math.floor(Math.random() * 50 + 5) + ' VEHICLES' }
+                ];
+                enrichedData.sources = [
+                    { name: 'Janes', icon: '🎖️', url: 'https://janes.com' },
+                    { name: 'Oryx OSINT', icon: '📸', url: 'https://oryxspioenkop.com' },
+                    { name: 'Sentinel Hub', icon: '🛰️', url: 'https://sentinel-hub.com' }
+                ];
+                enrichedData.confidence = Math.floor(Math.random() * 3) + 2;
+            } else {
+                // Generic intel
+                enrichedData.summary = 'Intelligence report received from automated monitoring systems. Cross-referencing with known patterns and historical data for context analysis.';
+                enrichedData.intel = [
+                    { label: 'Category', value: source.toUpperCase() },
+                    { label: 'Priority', value: type === 'alert' ? 'CRITICAL' : type === 'warning' ? 'HIGH' : 'ROUTINE' },
+                    { label: 'Region', value: location ? 'GEOLOCATED' : 'UNKNOWN' },
+                    { label: 'Status', value: 'MONITORING' }
+                ];
+                enrichedData.sources = [
+                    { name: 'OSINT Aggregator', icon: '🔍', url: '#' }
+                ];
+                enrichedData.confidence = Math.floor(Math.random() * 3) + 2;
+            }
+
+            // Add location-based intel if available
+            if (location && location.lat && location.lon) {
+                enrichedData.intel.push({ label: 'Coordinates', value: `${location.lat.toFixed(3)}°, ${location.lon.toFixed(3)}°` });
+            }
+
+            // Generate time data
+            const now = Date.now();
+            const firstReportedOffset = Math.floor(Math.random() * 7200000); // Up to 2 hours ago
+            enrichedData.firstReported = new Date(now - firstReportedOffset).toISOString().substr(11, 8);
+            enrichedData.lastUpdated = new Date(now - Math.floor(Math.random() * 300000)).toISOString().substr(11, 8);
+
+            // Generate related items
+            const relatedTemplates = [
+                'Previous activity in same region (2h ago)',
+                'Related vessel movement detected',
+                'Similar pattern observed last week',
+                'Connected to ongoing operation',
+                'Follow-up satellite pass scheduled'
+            ];
+            const numRelated = Math.floor(Math.random() * 3);
+            for (let i = 0; i < numRelated; i++) {
+                enrichedData.related.push(relatedTemplates[Math.floor(Math.random() * relatedTemplates.length)]);
+            }
+
+            return enrichedData;
+        }
+
+        function getRandomItem(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        // Collapse any expanded feed item
+        function collapseFeedItem() {
+            if (expandedFeedItem) {
+                expandedFeedItem.classList.remove('expanded');
+                expandedFeedItem = null;
+
+                // Remove faded class from all items
+                document.querySelectorAll('.feed-item.faded').forEach(item => {
+                    item.classList.remove('faded');
+                });
+            }
+        }
+
+        // Expand a feed item
+        function expandFeedItem(item) {
+            // If clicking the same item, collapse it
+            if (expandedFeedItem === item) {
+                collapseFeedItem();
+                return;
+            }
+
+            // Collapse any existing expanded item
+            collapseFeedItem();
+
+            // Expand this item
+            item.classList.add('expanded');
+            expandedFeedItem = item;
+
+            // Fade other items
+            document.querySelectorAll('.feed-item').forEach(otherItem => {
+                if (otherItem !== item) {
+                    otherItem.classList.add('faded');
+                }
+            });
+
+            // Scroll into view
+            item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
         // Initialize feed with sample data
         function addFeedItem(text, type = 'normal', source = 'OSINT-AUTO', location = null) {
             // Update feed activity timestamp
@@ -1973,11 +2439,87 @@
 
             const timestamp = new Date().toISOString().substr(11, 8);
 
+            // Generate enriched data
+            const enrichedData = generateEnrichedData(text, type, source, location);
+
+            // Build the HTML
+            let enrichedHTML = '';
+            if (enrichedData) {
+                // Build confidence bar
+                let confidenceBar = '';
+                for (let i = 1; i <= 5; i++) {
+                    const filled = i <= enrichedData.confidence;
+                    const isHigh = enrichedData.confidence >= 4;
+                    confidenceBar += `<div class="confidence-segment ${filled ? 'filled' : ''} ${filled && isHigh ? 'high' : ''}"></div>`;
+                }
+
+                // Build intel grid
+                let intelGrid = enrichedData.intel.map(intel => `
+                    <div class="feed-intel-item">
+                        <div class="feed-intel-label">${intel.label}</div>
+                        <div class="feed-intel-value">${intel.value}</div>
+                    </div>
+                `).join('');
+
+                // Build source links
+                let sourceLinks = enrichedData.sources.map(src => `
+                    <a href="${src.url}" target="_blank" rel="noopener" class="feed-source-link" onclick="event.stopPropagation()">
+                        <span class="feed-source-icon">${src.icon}</span>
+                        ${src.name}
+                    </a>
+                `).join('');
+
+                // Build related items
+                let relatedItems = enrichedData.related.map(rel => `
+                    <div class="feed-related-item">${rel}</div>
+                `).join('');
+
+                enrichedHTML = `
+                    <div class="feed-expanded">
+                        <div class="feed-summary">${enrichedData.summary}</div>
+
+                        <div class="feed-confidence">
+                            <div class="confidence-bar">${confidenceBar}</div>
+                            <span class="confidence-label">Confidence: ${enrichedData.confidence}/5</span>
+                        </div>
+
+                        <div class="feed-intel-grid">${intelGrid}</div>
+
+                        <div class="feed-sources">
+                            <div class="feed-sources-title">Sources</div>
+                            ${sourceLinks}
+                        </div>
+
+                        ${relatedItems ? `
+                            <div class="feed-related">
+                                <div class="feed-related-title">Related Intel</div>
+                                ${relatedItems}
+                            </div>
+                        ` : ''}
+
+                        <div class="feed-time-details">
+                            <span>First reported: ${enrichedData.firstReported} UTC</span>
+                            <span>Updated: ${enrichedData.lastUpdated} UTC</span>
+                        </div>
+
+                        <div class="feed-close-hint">tap to collapse</div>
+                    </div>
+                `;
+            }
+
             item.innerHTML = `
                 <div class="feed-timestamp">${timestamp} UTC</div>
-                <div>${text}</div>
+                <div class="feed-headline">${text}</div>
                 <div class="feed-source">SRC: ${source}</div>
+                ${enrichedHTML}
             `;
+
+            // Add click handler for expand/collapse
+            item.addEventListener('click', (e) => {
+                // Don't expand if clicking a link
+                if (e.target.tagName === 'A') return;
+                expandFeedItem(item);
+            });
 
             // Store location data on the element
             if (location) {
