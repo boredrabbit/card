@@ -1,0 +1,3601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>OSINT Situation Monitor</title>
+    <style>
+        /* Theme Variables */
+        :root {
+            /* Military Green Theme (default) */
+            --primary: #00ff41;
+            --primary-rgb: 0, 255, 65;
+            --primary-dim: rgba(0, 255, 65, 0.7);
+            --primary-faint: rgba(0, 255, 65, 0.3);
+            --primary-ghost: rgba(0, 255, 65, 0.1);
+            --bg-dark: #000000;
+            --bg-panel: rgba(0, 20, 5, 0.95);
+            --bg-panel-alt: rgba(0, 10, 3, 0.9);
+            --border: rgba(0, 255, 65, 0.2);
+            --border-bright: rgba(0, 255, 65, 0.4);
+            --text: #00ff41;
+            --text-dim: rgba(0, 255, 65, 0.6);
+            --alert: #ff0000;
+            --alert-rgb: 255, 0, 0;
+            --warning: #ffaa00;
+            --warning-rgb: 255, 170, 0;
+            --naval: #0099ff;
+            --scanline-color: rgba(0, 255, 65, 0.03);
+        }
+
+        /* Monochrome OLED Theme - True Black */
+        [data-theme="mono"] {
+            --primary: #ffffff;
+            --primary-rgb: 255, 255, 255;
+            --primary-dim: rgba(255, 255, 255, 0.6);
+            --primary-faint: rgba(255, 255, 255, 0.2);
+            --primary-ghost: rgba(255, 255, 255, 0.05);
+            --bg-dark: #000000;
+            --bg-panel: rgba(0, 0, 0, 0.98);
+            --bg-panel-alt: rgba(0, 0, 0, 0.95);
+            --border: rgba(255, 255, 255, 0.12);
+            --border-bright: rgba(255, 255, 255, 0.25);
+            --text: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.45);
+            --alert: #ff4444;
+            --alert-rgb: 255, 68, 68;
+            --warning: #ffcc00;
+            --warning-rgb: 255, 204, 0;
+            --naval: #6699ff;
+            --scanline-color: rgba(255, 255, 255, 0.01);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: var(--bg-dark);
+            color: var(--text);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Pure black background for OLED - maximum contrast */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000000;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Subtle scan lines effect */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                var(--scanline-color) 0px,
+                transparent 1px,
+                transparent 2px,
+                var(--scanline-color) 3px
+            );
+            pointer-events: none;
+            z-index: 100;
+            animation: scanlines 8s linear infinite;
+        }
+
+        @keyframes scanlines {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(4px); }
+        }
+
+        /* Main container */
+        .monitor-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: grid;
+            grid-template-rows: 40px 1fr auto;
+            grid-template-columns: 1fr 400px;
+            gap: 1px;
+            background: var(--primary-ghost);
+            z-index: 1;
+        }
+
+        /* Top status bar */
+        .status-bar {
+            grid-column: 1 / -1;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-size: 11px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 6px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-indicator.warning {
+            background: var(--warning);
+        }
+
+        .status-indicator.alert {
+            background: var(--alert);
+            animation: pulse-fast 0.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+
+        /* World map container */
+        .map-container {
+            position: relative;
+            background: var(--bg-panel-alt);
+            border-right: 1px solid var(--primary-ghost);
+            overflow: hidden;
+        }
+
+        #worldMap {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Live feed sidebar */
+        .feed-sidebar {
+            background: var(--bg-panel-alt);
+            overflow-y: auto;
+            border-left: 1px solid var(--border);
+        }
+
+        .feed-header {
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+            font-size: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--primary-dim);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Feed status indicator light */
+        .feed-status-light {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 4px rgba(var(--primary-rgb), 0.6);
+            animation: feed-status-pulse 3s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+
+        .feed-status-light.inactive {
+            background: var(--alert);
+            box-shadow: 0 0 3px rgba(var(--alert-rgb), 0.5);
+            animation: none;
+        }
+
+        @keyframes feed-status-pulse {
+            0%, 100% {
+                opacity: 0.9;
+                box-shadow: 0 0 4px rgba(var(--primary-rgb), 0.6);
+            }
+            50% {
+                opacity: 0.4;
+                box-shadow: 0 0 2px rgba(var(--primary-rgb), 0.3);
+            }
+        }
+
+        .feed-items {
+            padding: 10px;
+        }
+
+        .feed-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(var(--primary-rgb), 0.02);
+            border-left: 2px solid var(--primary-faint);
+            font-size: 11px;
+            line-height: 1.5;
+            transition: all 0.15s ease-out;
+        }
+
+        .feed-item:hover {
+            background: rgba(var(--primary-rgb), 0.05);
+            border-left-color: var(--primary-dim);
+        }
+
+        .feed-item.highlighted {
+            background: rgba(var(--primary-rgb), 0.15);
+            border-left-color: var(--primary);
+            box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.4);
+            animation: feed-pulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes feed-pulse {
+            0%, 100% {
+                box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.4);
+            }
+            50% {
+                box-shadow: 0 0 25px rgba(var(--primary-rgb), 0.6);
+            }
+        }
+
+        .feed-item.alert {
+            border-left-color: var(--alert);
+            background: rgba(var(--alert-rgb), 0.05);
+        }
+
+        .feed-item.alert.highlighted {
+            background: rgba(var(--alert-rgb), 0.2);
+            border-left-color: var(--alert);
+            box-shadow: 0 0 20px rgba(var(--alert-rgb), 0.5);
+            animation: alert-pulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes alert-pulse {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(var(--alert-rgb), 0.5);
+            }
+            50% {
+                box-shadow: 0 0 30px rgba(var(--alert-rgb), 0.7);
+            }
+        }
+
+        .feed-item.warning {
+            border-left-color: var(--warning);
+            background: rgba(var(--warning-rgb), 0.03);
+        }
+
+        .feed-item.warning.highlighted {
+            background: rgba(var(--warning-rgb), 0.15);
+            border-left-color: var(--warning);
+            box-shadow: 0 0 18px rgba(var(--warning-rgb), 0.5);
+            animation: warning-pulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes warning-pulse {
+            0%, 100% {
+                box-shadow: 0 0 18px rgba(var(--warning-rgb), 0.5);
+            }
+            50% {
+                box-shadow: 0 0 28px rgba(var(--warning-rgb), 0.7);
+            }
+        }
+
+        .feed-timestamp {
+            font-size: 9px;
+            color: var(--text-dim);
+            margin-bottom: 5px;
+        }
+
+        .feed-source {
+            font-size: 9px;
+            color: var(--text-dim);
+            margin-top: 5px;
+            font-style: italic;
+            opacity: 0.7;
+        }
+
+        /* Submarine Intel Panel - Dark, minimal style */
+        .submarine-intel-panel {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 240px;
+            max-height: 55vh;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid rgba(var(--primary-rgb), 0.1);
+            border-left: none;
+            border-radius: 0 3px 3px 0;
+            z-index: 100;
+            transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
+            display: flex;
+            flex-direction: column;
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .submarine-intel-panel.collapsed {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .sub-intel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(var(--primary-rgb), 0.08);
+            cursor: pointer;
+        }
+
+        .sub-intel-header:hover {
+            background: rgba(var(--primary-rgb), 0.03);
+        }
+
+        .sub-intel-title {
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        .sub-intel-toggle {
+            font-size: 9px;
+            color: var(--text-dim);
+            opacity: 0.5;
+        }
+
+        .sub-intel-content {
+            padding: 8px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .sub-intel-summary {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(var(--primary-rgb), 0.06);
+            font-size: 8px;
+            color: var(--text-dim);
+            opacity: 0.7;
+        }
+
+        .sub-stat {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .sub-stat-value {
+            color: var(--text-dim);
+        }
+
+        .sub-intel-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        /* Submarine entries - minimal dark style */
+        .sub-entry {
+            margin-bottom: 6px;
+            padding: 6px 8px;
+            background: transparent;
+            border-left: 1px solid rgba(var(--primary-rgb), 0.15);
+            font-size: 10px;
+            line-height: 1.3;
+            cursor: pointer;
+            transition: all 0.1s ease-out;
+        }
+
+        .sub-entry:hover {
+            background: rgba(var(--primary-rgb), 0.03);
+            border-left-color: var(--primary-dim);
+        }
+
+        /* Country-specific left borders - muted */
+        .sub-entry.usa { border-left-color: rgba(60, 100, 160, 0.6); }
+        .sub-entry.uk { border-left-color: rgba(70, 110, 160, 0.6); }
+        .sub-entry.france { border-left-color: rgba(60, 100, 150, 0.6); }
+        .sub-entry.russia { border-left-color: rgba(140, 50, 50, 0.7); }
+        .sub-entry.china { border-left-color: rgba(160, 120, 40, 0.6); }
+        .sub-entry.india { border-left-color: rgba(160, 120, 60, 0.6); }
+        .sub-entry.israel { border-left-color: rgba(70, 110, 150, 0.6); }
+        .sub-entry.north-korea { border-left-color: rgba(120, 40, 40, 0.7); }
+
+        .sub-entry-name {
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        .sub-entry-type {
+            font-size: 8px;
+            color: var(--text-dim);
+            opacity: 0.6;
+            margin-top: 2px;
+        }
+
+        .sub-entry-status {
+            font-size: 8px;
+            color: var(--text-dim);
+            opacity: 0.5;
+            font-style: italic;
+        }
+
+        /* Toggle tab to reopen submarine panel */
+        .sub-panel-tab {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(var(--primary-rgb), 0.1);
+            border-left: none;
+            border-radius: 0 3px 3px 0;
+            padding: 8px 6px;
+            cursor: pointer;
+            font-size: 8px;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+            opacity: 0.4;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            z-index: 99;
+            transition: opacity 0.2s;
+        }
+
+        .sub-panel-tab:hover {
+            opacity: 0.8;
+        }
+
+        .sub-panel-tab.hidden {
+            display: none;
+        }
+
+        /* Bottom data panel */
+        .data-panel {
+            grid-column: 1 / -1;
+            background: var(--bg-panel);
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            max-height: 200px;
+        }
+
+        .data-panel.collapsed {
+            max-height: 28px;
+        }
+
+        .data-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .data-panel-header:hover {
+            background: rgba(var(--primary-rgb), 0.05);
+        }
+
+        .data-panel-title {
+            font-size: 9px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        .data-panel-toggle {
+            font-size: 10px;
+            color: var(--primary-dim);
+            transition: transform 0.3s ease-out;
+        }
+
+        .data-panel.collapsed .data-panel-toggle {
+            transform: rotate(180deg);
+        }
+
+        .data-panel-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1px;
+            padding: 10px;
+            overflow-x: auto;
+            flex: 1;
+        }
+
+        .data-panel.collapsed .data-panel-content {
+            display: none;
+        }
+
+        .data-metric {
+            padding: 10px;
+            background: rgba(var(--primary-rgb), 0.02);
+            border: 1px solid var(--primary-ghost);
+        }
+
+        .metric-label {
+            font-size: 9px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--primary);
+            font-family: 'Courier New', monospace;
+        }
+
+        .metric-change {
+            font-size: 10px;
+            margin-top: 3px;
+        }
+
+        .metric-change.up {
+            color: var(--alert);
+        }
+
+        .metric-change.down {
+            color: var(--primary);
+        }
+
+        /* Anomaly alert overlay */
+        .anomaly-alert {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(var(--alert-rgb), 0.1);
+            border: 2px solid var(--alert);
+            padding: 30px;
+            font-size: 14px;
+            text-align: center;
+            color: var(--alert);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            z-index: 1000;
+            display: none;
+            animation: anomaly-pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes anomaly-pulse {
+            0%, 100% {
+                border-color: var(--alert);
+                box-shadow: 0 0 20px rgba(var(--alert-rgb), 0.5);
+            }
+            50% {
+                border-color: rgba(var(--alert-rgb), 0.7);
+                box-shadow: 0 0 40px rgba(var(--alert-rgb), 0.8);
+            }
+        }
+
+        /* Scrollbar styling */
+        .feed-sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .feed-sidebar::-webkit-scrollbar-track {
+            background: var(--bg-panel);
+        }
+
+        .feed-sidebar::-webkit-scrollbar-thumb {
+            background: var(--primary-faint);
+        }
+
+        .feed-sidebar::-webkit-scrollbar-thumb:hover {
+            background: var(--text-dim);
+        }
+
+        /* Loading animation */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .feed-item {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        /* Map markers */
+        .map-marker {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: marker-pulse 2s ease-in-out infinite;
+            cursor: pointer;
+        }
+
+        .map-marker.military {
+            background: var(--alert);
+        }
+
+        .map-marker.naval {
+            background: var(--naval);
+        }
+
+        @keyframes marker-pulse {
+            0%, 100% {
+                box-shadow: 0 0 5px currentColor;
+            }
+            50% {
+                box-shadow: 0 0 20px currentColor;
+            }
+        }
+
+        /* Connection lines for unusual activity */
+        .connection-line {
+            position: absolute;
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(255, 255, 255, 0.3) 50%,
+                transparent 100%);
+            transform-origin: left center;
+            animation: line-flow 3s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes line-flow {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.8; }
+        }
+
+        /* Hover Tooltip - Minimal Dark Mode */
+        .asset-tooltip {
+            position: fixed;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 10px 14px;
+            font-size: 9px;
+            line-height: 1.5;
+            letter-spacing: 0.8px;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+            min-width: 180px;
+            max-width: 280px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(8px);
+        }
+
+        .asset-tooltip.visible {
+            display: block;
+        }
+
+        .tooltip-header {
+            color: var(--primary);
+            font-weight: 500;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 1.5px;
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 9px;
+        }
+
+        .tooltip-label {
+            color: rgba(255, 255, 255, 0.35);
+            text-transform: uppercase;
+            font-size: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .tooltip-alert {
+            color: var(--alert);
+            font-weight: 500;
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 8px;
+            letter-spacing: 1px;
+        }
+
+        /* News section in tooltips */
+        .tooltip-news {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .tooltip-news-header {
+            color: rgba(255, 255, 255, 0.35);
+            font-size: 7px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .tooltip-news-item {
+            margin-bottom: 6px;
+            padding-left: 8px;
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tooltip-news-title {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 8px;
+            line-height: 1.4;
+            margin-bottom: 2px;
+        }
+
+        .tooltip-news-meta {
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 7px;
+        }
+
+        .tooltip-news-loading {
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 8px;
+            font-style: italic;
+        }
+
+        /* Zoom controls */
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 50;
+        }
+
+        .zoom-btn {
+            background: var(--bg-panel);
+            border: 1px solid var(--primary-faint);
+            color: var(--primary);
+            width: 20px;
+            height: 20px;
+            font-size: 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .zoom-btn:hover {
+            background: var(--bg-panel-alt);
+            border-color: var(--text-dim);
+            box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.3);
+        }
+
+        .zoom-indicator {
+            background: var(--bg-panel);
+            border: 1px solid var(--primary-faint);
+            color: var(--primary);
+            padding: 4px 6px;
+            font-size: 7px;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+
+        /* Ruler/Coordinate Mode */
+        .zoom-btn.active {
+            background: rgba(var(--primary-rgb), 0.2);
+            border-color: var(--primary-dim);
+            box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.4);
+        }
+
+        .coordinate-display {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-bright);
+            padding: 10px 14px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: var(--primary);
+            z-index: 50;
+            display: none;
+            min-width: 200px;
+        }
+
+        .coordinate-display.visible {
+            display: block;
+        }
+
+        .coord-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+        }
+
+        .coord-label {
+            color: var(--text-dim);
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .coord-value {
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .coord-header {
+            color: var(--primary-dim);
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Nuclear layer toggle */
+        .nuclear-toggle {
+            background: var(--bg-panel);
+            border: 1px solid rgba(255, 200, 0, 0.3);
+            color: rgba(255, 200, 0, 0.8);
+            padding: 4px 8px;
+            font-size: 8px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+            margin-right: 8px;
+        }
+
+        .nuclear-toggle:hover {
+            background: rgba(255, 200, 0, 0.1);
+            border-color: rgba(255, 200, 0, 0.5);
+        }
+
+        .nuclear-toggle.active {
+            background: rgba(255, 200, 0, 0.2);
+            border-color: rgba(255, 200, 0, 0.7);
+            color: rgba(255, 200, 0, 1);
+            box-shadow: 0 0 15px rgba(255, 200, 0, 0.3);
+        }
+
+        .nuclear-toggle .event-count {
+            display: inline-block;
+            background: rgba(255, 50, 50, 0.8);
+            color: white;
+            padding: 1px 4px;
+            border-radius: 8px;
+            font-size: 7px;
+            margin-left: 4px;
+            min-width: 14px;
+            text-align: center;
+        }
+
+        .nuclear-toggle.active .event-count {
+            background: rgba(255, 50, 50, 1);
+            animation: pulse-badge 2s infinite;
+        }
+
+        @keyframes pulse-badge {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Theme toggle button */
+        .theme-toggle {
+            background: var(--bg-panel);
+            border: 1px solid var(--primary-faint);
+            color: var(--primary);
+            padding: 4px 8px;
+            font-size: 8px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-panel-alt);
+            border-color: var(--text-dim);
+        }
+    </style>
+</head>
+<body>
+    <!-- Status Bar -->
+    <div class="monitor-container">
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-indicator"></span>
+                <span>OSINT MONITOR ACTIVE</span>
+            </div>
+            <div class="status-item">
+                <span id="currentTime">--:--:-- UTC</span>
+            </div>
+            <div class="status-item">
+                <span>DEFCON: <span id="defconLevel">5</span></span>
+            </div>
+            <div class="status-item">
+                <span>TRACKED ASSETS: <span id="assetCount">0</span></span>
+            </div>
+            <div class="status-item">
+                <span>ANOMALIES: <span id="anomalyCount">0</span></span>
+            </div>
+            <div class="status-item">
+                <button class="nuclear-toggle" id="nuclearToggle" title="Toggle Nuclear Tracking Layer">☢ NUCLEAR <span class="event-count" id="nuclearEventCount">0</span></button>
+                <button class="theme-toggle" id="themeToggle" title="Toggle Theme">◐ MONO</button>
+            </div>
+        </div>
+
+        <!-- World Map -->
+        <div class="map-container">
+            <canvas id="worldMap"></canvas>
+
+            <!-- Zoom Controls -->
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoomIn" title="Zoom In">+</button>
+                <button class="zoom-btn" id="zoomOut" title="Zoom Out">−</button>
+                <button class="zoom-btn" id="zoomReset" title="Reset View" style="font-size: 8px;">⌂</button>
+                <button class="zoom-btn" id="rulerMode" title="Coordinate Mode" style="font-size: 8px; margin-top: 10px;">⊞</button>
+                <div class="zoom-indicator" id="zoomLevel">ZOOM: 1.0x</div>
+            </div>
+
+            <!-- Coordinate Display -->
+            <div class="coordinate-display" id="coordinateDisplay">
+                <div class="coord-header">◎ CURSOR POSITION</div>
+                <div class="coord-row">
+                    <span class="coord-label">LAT</span>
+                    <span class="coord-value" id="cursorLat">---.----°</span>
+                </div>
+                <div class="coord-row">
+                    <span class="coord-label">LON</span>
+                    <span class="coord-value" id="cursorLon">---.----°</span>
+                </div>
+                <div class="coord-row" style="margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border);">
+                    <span class="coord-label">DMS</span>
+                    <span class="coord-value" id="cursorDMS" style="font-size: 10px;">--°--'--"</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Feed -->
+        <div class="feed-sidebar">
+            <div class="feed-header">
+                <span class="feed-status-light" id="feedStatusLight"></span>
+                LIVE INTELLIGENCE FEED
+            </div>
+            <div class="feed-items" id="feedItems">
+                <!-- Feed items will be populated here -->
+            </div>
+        </div>
+
+        <!-- Submarine Panel Toggle Tab (shows when panel is hidden) -->
+        <div class="sub-panel-tab hidden" id="subPanelTab">SSBN</div>
+
+        <!-- Submarine Intel Panel (Left side) -->
+        <div class="submarine-intel-panel" id="submarineIntelPanel">
+            <div class="sub-intel-header" id="subIntelHeader">
+                <span class="sub-intel-title">SSBN TRACKING</span>
+                <span class="sub-intel-toggle">[x]</span>
+            </div>
+            <div class="sub-intel-content" id="subIntelContent">
+                <div class="sub-intel-summary">
+                    <div class="sub-stat">
+                        <span class="sub-stat-value" id="subActiveCount">0</span> contacts
+                    </div>
+                    <div class="sub-stat">
+                        <span class="sub-stat-value" id="subNationsCount">0</span> nations
+                    </div>
+                </div>
+                <div class="sub-intel-list" id="submarineList">
+                    <!-- Submarine entries will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Data Panel -->
+        <div class="data-panel" id="dataPanel">
+            <div class="data-panel-header" id="dataPanelHeader">
+                <span class="data-panel-title">◈ VESSEL / AIRCRAFT TRACKER HUB</span>
+                <span class="data-panel-toggle">▼</span>
+            </div>
+            <div class="data-panel-content">
+                <div class="data-metric">
+                    <div class="metric-label">Military Aircraft</div>
+                    <div class="metric-value" id="militaryAircraft">0</div>
+                    <div class="metric-change up" id="aircraftChange">+0 (24h)</div>
+                </div>
+                <div class="data-metric">
+                    <div class="metric-label">Naval Vessels</div>
+                    <div class="metric-value" id="navalVessels">0</div>
+                    <div class="metric-change down" id="navalChange">-0 (24h)</div>
+                </div>
+                <div class="data-metric">
+                    <div class="metric-label">Nuclear Bases</div>
+                    <div class="metric-value" id="nuclearBases">0</div>
+                    <div class="metric-change" id="nuclearBasesChange">TRACKED</div>
+                </div>
+                <div class="data-metric">
+                    <div class="metric-label">Nuclear Aircraft</div>
+                    <div class="metric-value" id="nuclearAircraft">0</div>
+                    <div class="metric-change up" id="nuclearAircraftChange">LIVE</div>
+                </div>
+                <div class="data-metric">
+                    <div class="metric-label">Spaceports</div>
+                    <div class="metric-value" id="spaceports">0</div>
+                    <div class="metric-change" id="spaceportsChange">ACTIVE</div>
+                </div>
+                <div class="data-metric">
+                    <div class="metric-label">Pattern Alerts</div>
+                    <div class="metric-value" id="patternAlerts">0</div>
+                    <div class="metric-change up" id="patternChange">+0 (1h)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Anomaly Alert (Hidden by default) -->
+    <div class="anomaly-alert" id="anomalyAlert">
+        ⚠ PATTERN ANOMALY DETECTED ⚠
+        <div style="font-size: 11px; margin-top: 10px;">
+            Unusual military activity detected in monitored region
+        </div>
+    </div>
+
+    <!-- Hover Tooltip -->
+    <div class="asset-tooltip" id="assetTooltip"></div>
+
+    <!-- Load OSINT Data Feeds -->
+    <script src="osint-data-feeds.js?v=20260111a"></script>
+    <script src="osint-naval-tracking.js"></script>
+    <script src="conflict-zones-data.js"></script>
+    <script src="military-installations-data.js?v=20260111c"></script>
+    <script src="geojson-map-renderer.js?v=20260111g"></script>
+    <script src="conflict-news-service.js?v=20260111d"></script>
+    <script src="shipping-lane-risk-service.js?v=20260111a"></script>
+
+    <script>
+        // Theme state - load from localStorage or default to military
+        let currentTheme = localStorage.getItem('osint-theme') || 'military';
+
+        // Apply saved theme on load
+        if (currentTheme === 'mono') {
+            document.documentElement.setAttribute('data-theme', 'mono');
+        }
+
+        // Get computed theme colors for canvas drawing
+        function getThemeColors() {
+            const style = getComputedStyle(document.documentElement);
+            return {
+                primary: style.getPropertyValue('--primary').trim(),
+                primaryRgb: style.getPropertyValue('--primary-rgb').trim(),
+                primaryDim: style.getPropertyValue('--primary-dim').trim(),
+                primaryFaint: style.getPropertyValue('--primary-faint').trim(),
+                primaryGhost: style.getPropertyValue('--primary-ghost').trim(),
+                alert: style.getPropertyValue('--alert').trim(),
+                alertRgb: style.getPropertyValue('--alert-rgb').trim(),
+                warning: style.getPropertyValue('--warning').trim(),
+                warningRgb: style.getPropertyValue('--warning-rgb').trim(),
+                naval: style.getPropertyValue('--naval').trim(),
+                bgPanel: style.getPropertyValue('--bg-panel').trim(),
+                textDim: style.getPropertyValue('--text-dim').trim()
+            };
+        }
+
+        // Toggle theme
+        function toggleTheme() {
+            const html = document.documentElement;
+            const btn = document.getElementById('themeToggle');
+
+            if (currentTheme === 'military') {
+                html.setAttribute('data-theme', 'mono');
+                currentTheme = 'mono';
+                btn.textContent = '◐ GREEN';
+            } else {
+                html.removeAttribute('data-theme');
+                currentTheme = 'military';
+                btn.textContent = '◐ MONO';
+            }
+
+            // Save preference to localStorage
+            localStorage.setItem('osint-theme', currentTheme);
+
+            // Update map renderer colors if it exists
+            if (mapRenderer) {
+                mapRenderer.updateThemeColors(getThemeColors());
+            }
+        }
+
+        // Initialize canvas
+        const canvas = document.getElementById('worldMap');
+        const ctx = canvas.getContext('2d');
+        let mapRenderer = null;
+
+        // Ruler/Coordinate mode state
+        let rulerModeActive = false;
+        let cursorX = 0;
+        let cursorY = 0;
+        let cursorOnMap = false;
+
+        // Nuclear layer state
+        let nuclearLayerActive = false;
+        let lastNuclearEventCount = 0;
+        let processedNuclearEvents = new Set(); // Track events already added to feed
+
+        // Convert decimal degrees to DMS format
+        function toDMS(decimal, isLat) {
+            const abs = Math.abs(decimal);
+            const degrees = Math.floor(abs);
+            const minutesFloat = (abs - degrees) * 60;
+            const minutes = Math.floor(minutesFloat);
+            const seconds = ((minutesFloat - minutes) * 60).toFixed(1);
+            const direction = isLat ? (decimal >= 0 ? 'N' : 'S') : (decimal >= 0 ? 'E' : 'W');
+            return `${degrees}°${minutes}'${seconds}"${direction}`;
+        }
+
+        // Draw ruler borders around the map
+        function drawRulerBorder() {
+            if (!rulerModeActive || !mapRenderer) return;
+
+            const rulerWidth = 25; // Width of ruler border
+            const tickInterval = 30; // Pixels between tick marks
+            const majorTickEvery = 5; // Every 5th tick is major
+            const colors = getThemeColors();
+            const rgb = colors.primaryRgb || '0, 255, 65';
+
+            ctx.save();
+
+            // Ruler background - all 4 sides (pure black for OLED)
+            ctx.fillStyle = '#000000';
+            // Top
+            ctx.fillRect(0, 0, canvas.width, rulerWidth);
+            // Bottom
+            ctx.fillRect(0, canvas.height - rulerWidth, canvas.width, rulerWidth);
+            // Left
+            ctx.fillRect(0, rulerWidth, rulerWidth, canvas.height - rulerWidth * 2);
+            // Right
+            ctx.fillRect(canvas.width - rulerWidth, rulerWidth, rulerWidth, canvas.height - rulerWidth * 2);
+
+            // Ruler border lines
+            ctx.strokeStyle = `rgba(${rgb}, 0.6)`;
+            ctx.lineWidth = 1;
+
+            // Inner border rectangle
+            ctx.strokeRect(rulerWidth, rulerWidth, canvas.width - rulerWidth * 2, canvas.height - rulerWidth * 2);
+
+            // Outer border rectangle
+            ctx.strokeStyle = `rgba(${rgb}, 0.3)`;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+            // Draw tick marks and labels
+            ctx.fillStyle = `rgba(${rgb}, 0.8)`;
+            ctx.strokeStyle = `rgba(${rgb}, 0.5)`;
+            ctx.font = '7px Courier New';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Top and bottom rulers (longitude)
+            let tickCount = 0;
+            for (let x = rulerWidth; x < canvas.width - rulerWidth; x += tickInterval) {
+                const isMajor = tickCount % majorTickEvery === 0;
+                const tickLength = isMajor ? 12 : 6;
+
+                // Top ticks
+                ctx.beginPath();
+                ctx.moveTo(x, rulerWidth);
+                ctx.lineTo(x, rulerWidth - tickLength);
+                ctx.stroke();
+
+                // Bottom ticks
+                ctx.beginPath();
+                ctx.moveTo(x, canvas.height - rulerWidth);
+                ctx.lineTo(x, canvas.height - rulerWidth + tickLength);
+                ctx.stroke();
+
+                // Labels on major ticks
+                if (isMajor && mapRenderer) {
+                    const { lat, lon } = mapRenderer.toLatLon(x, canvas.height / 2);
+                    const lonLabel = lon.toFixed(0) + '°';
+                    ctx.fillText(lonLabel, x, 8);
+                    ctx.fillText(lonLabel, x, canvas.height - 8);
+                }
+
+                tickCount++;
+            }
+
+            // Left and right rulers (latitude)
+            tickCount = 0;
+            for (let y = rulerWidth; y < canvas.height - rulerWidth; y += tickInterval) {
+                const isMajor = tickCount % majorTickEvery === 0;
+                const tickLength = isMajor ? 12 : 6;
+
+                // Left ticks
+                ctx.beginPath();
+                ctx.moveTo(rulerWidth, y);
+                ctx.lineTo(rulerWidth - tickLength, y);
+                ctx.stroke();
+
+                // Right ticks
+                ctx.beginPath();
+                ctx.moveTo(canvas.width - rulerWidth, y);
+                ctx.lineTo(canvas.width - rulerWidth + tickLength, y);
+                ctx.stroke();
+
+                // Labels on major ticks
+                if (isMajor && mapRenderer) {
+                    const { lat, lon } = mapRenderer.toLatLon(canvas.width / 2, y);
+                    const latLabel = lat.toFixed(0) + '°';
+                    ctx.save();
+                    ctx.translate(8, y);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillText(latLabel, 0, 0);
+                    ctx.restore();
+
+                    ctx.save();
+                    ctx.translate(canvas.width - 8, y);
+                    ctx.rotate(Math.PI / 2);
+                    ctx.fillText(latLabel, 0, 0);
+                    ctx.restore();
+                }
+
+                tickCount++;
+            }
+
+            // Corner decorations
+            ctx.strokeStyle = `rgba(${rgb}, 0.8)`;
+            ctx.lineWidth = 2;
+            const cornerSize = 8;
+
+            // Top-left
+            ctx.beginPath();
+            ctx.moveTo(0, cornerSize);
+            ctx.lineTo(0, 0);
+            ctx.lineTo(cornerSize, 0);
+            ctx.stroke();
+
+            // Top-right
+            ctx.beginPath();
+            ctx.moveTo(canvas.width - cornerSize, 0);
+            ctx.lineTo(canvas.width, 0);
+            ctx.lineTo(canvas.width, cornerSize);
+            ctx.stroke();
+
+            // Bottom-left
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height - cornerSize);
+            ctx.lineTo(0, canvas.height);
+            ctx.lineTo(cornerSize, canvas.height);
+            ctx.stroke();
+
+            // Bottom-right
+            ctx.beginPath();
+            ctx.moveTo(canvas.width - cornerSize, canvas.height);
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.lineTo(canvas.width, canvas.height - cornerSize);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // Draw crosshairs at cursor position
+        function drawCrosshairs() {
+            if (!rulerModeActive || !cursorOnMap) return;
+
+            const rulerWidth = 25;
+            const colors = getThemeColors();
+            const rgb = colors.primaryRgb || '0, 255, 65';
+
+            ctx.save();
+
+            // Crosshair lines
+            ctx.strokeStyle = `rgba(${rgb}, 0.4)`;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+
+            // Vertical line
+            ctx.beginPath();
+            ctx.moveTo(cursorX, rulerWidth);
+            ctx.lineTo(cursorX, canvas.height - rulerWidth);
+            ctx.stroke();
+
+            // Horizontal line
+            ctx.beginPath();
+            ctx.moveTo(rulerWidth, cursorY);
+            ctx.lineTo(canvas.width - rulerWidth, cursorY);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+
+            // Crosshair center marker
+            ctx.strokeStyle = `rgba(${rgb}, 0.9)`;
+            ctx.lineWidth = 2;
+            const centerSize = 10;
+
+            ctx.beginPath();
+            ctx.moveTo(cursorX - centerSize, cursorY);
+            ctx.lineTo(cursorX - 4, cursorY);
+            ctx.moveTo(cursorX + 4, cursorY);
+            ctx.lineTo(cursorX + centerSize, cursorY);
+            ctx.moveTo(cursorX, cursorY - centerSize);
+            ctx.lineTo(cursorX, cursorY - 4);
+            ctx.moveTo(cursorX, cursorY + 4);
+            ctx.lineTo(cursorX, cursorY + centerSize);
+            ctx.stroke();
+
+            // Highlight on rulers where cursor is
+            ctx.fillStyle = `rgba(${rgb}, 0.3)`;
+
+            // Top ruler highlight
+            ctx.fillRect(cursorX - 2, 0, 4, rulerWidth);
+            // Bottom ruler highlight
+            ctx.fillRect(cursorX - 2, canvas.height - rulerWidth, 4, rulerWidth);
+            // Left ruler highlight
+            ctx.fillRect(0, cursorY - 2, rulerWidth, 4);
+            // Right ruler highlight
+            ctx.fillRect(canvas.width - rulerWidth, cursorY - 2, rulerWidth, 4);
+
+            ctx.restore();
+        }
+
+        // Update coordinate display
+        function updateCoordinateDisplay(mouseX, mouseY) {
+            if (!rulerModeActive || !mapRenderer) return;
+
+            const { lat, lon } = mapRenderer.toLatLon(mouseX, mouseY);
+
+            document.getElementById('cursorLat').textContent = lat.toFixed(4) + '°' + (lat >= 0 ? 'N' : 'S');
+            document.getElementById('cursorLon').textContent = Math.abs(lon).toFixed(4) + '°' + (lon >= 0 ? 'E' : 'W');
+            document.getElementById('cursorDMS').textContent = toDMS(lat, true) + ' ' + toDMS(lon, false);
+        }
+
+        function resizeCanvas() {
+            const oldWidth = canvas.width;
+            const oldHeight = canvas.height;
+
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            console.log(`📐 resizeCanvas(): ${oldWidth}x${oldHeight} → ${canvas.width}x${canvas.height}`);
+
+            if (mapRenderer && mapRenderer.countries) {
+                console.log('📐 Calling drawWorldMap() after resize...');
+                drawWorldMap();
+            } else {
+                console.warn('⚠️ resizeCanvas() - cannot draw map yet:', {
+                    hasRenderer: !!mapRenderer,
+                    hasCountries: mapRenderer ? !!mapRenderer.countries : false
+                });
+            }
+        }
+
+        // Simple world map projection (equirectangular)
+        function drawWorldMap() {
+            // Fill with pure black for OLED - true black background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw map grid - ultra subtle for deep black OLED
+            const colors = getThemeColors();
+            const gridRgb = colors.primaryRgb || (currentTheme === 'mono' ? '255, 255, 255' : '0, 255, 65');
+            ctx.strokeStyle = `rgba(${gridRgb}, 0.015)`;
+            ctx.lineWidth = 0.3;
+
+            // Latitude lines
+            for (let lat = -90; lat <= 90; lat += 15) {
+                const y = canvas.height * ((90 - lat) / 180);
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Longitude lines
+            for (let lon = -180; lon <= 180; lon += 15) {
+                const x = canvas.width * ((lon + 180) / 360);
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            // Draw continents using GeoJSON data
+            if (mapRenderer && mapRenderer.countries) {
+                // Removed excessive logging
+                mapRenderer.drawCountries();
+
+                // Draw conflict zones, battle zones, and cities (with shared label collision detection)
+                if (conflictZonesData) {
+                    mapRenderer.drawConflictZones(conflictZonesData);
+                    const battleLabelBoxes = mapRenderer.drawBattleZones(conflictZonesData);
+                    mapRenderer.drawCities(conflictZonesData, battleLabelBoxes);
+                }
+
+                // Draw shipping lanes with hover highlighting
+                const hoveredLaneId = hoveredShippingLane ? hoveredShippingLane.id : null;
+                mapRenderer.drawShippingLanes(hoveredLaneId);
+                mapRenderer.drawLabels();
+
+                // Draw shipping lane info card if hovering
+                if (hoveredShippingLane && cursorOnMap) {
+                    mapRenderer.drawShippingLaneCard(hoveredShippingLane, lastMouseX, lastMouseY);
+                }
+            } else {
+                console.warn('⚠️ drawWorldMap() - mapRenderer not ready:', {
+                    hasRenderer: !!mapRenderer,
+                    hasCountries: mapRenderer ? !!mapRenderer.countries : false
+                });
+            }
+        }
+
+        function drawContinents_DEPRECATED() {
+            ctx.strokeStyle = 'rgba(0, 255, 65, 0.3)';
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.06)';
+            ctx.lineWidth = 1.5;
+
+            // Helper function to convert lat/lon to canvas coordinates
+            const toCanvas = (lat, lon) => ({
+                x: canvas.width * ((lon + 180) / 360),
+                y: canvas.height * ((90 - lat) / 180)
+            });
+
+            // North America - more realistic shape
+            ctx.beginPath();
+            let points = [
+                [72, -156], [70, -141], [60, -135], [58, -137], [54, -130], [52, -128],
+                [49, -123], [48, -124], [42, -124], [32, -117], [32, -115], [25, -97],
+                [29, -95], [30, -88], [25, -80], [18, -77], [25, -80], [28, -82],
+                [30, -84], [30, -87], [41, -73], [45, -74], [47, -67], [47, -52],
+                [52, -56], [58, -64], [60, -65], [69, -68], [73, -68], [74, -95],
+                [74, -105], [82, -84], [73, -74], [73, -85], [74, -96], [74, -125],
+                [72, -156]
+            ];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // South America - improved shape
+            ctx.beginPath();
+            points = [
+                [12, -72], [11, -71], [8, -79], [0, -78], [-5, -81], [-10, -78],
+                [-18, -70], [-20, -70], [-34, -71], [-41, -73], [-45, -67],
+                [-52, -69], [-55, -68], [-55, -67], [-50, -73], [-46, -75],
+                [-33, -71], [-23, -70], [-18, -65], [-12, -77], [-8, -79],
+                [-4, -81], [1, -80], [5, -77], [10, -75], [11, -73], [12, -72]
+            ];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Europe - more detail
+            ctx.beginPath();
+            points = [
+                [71, -9], [71, 25], [70, 28], [69, 33], [60, 31], [58, 30],
+                [55, 38], [60, 49], [64, 59], [69, 60], [70, 88], [70, 105],
+                [77, 104], [73, 142], [70, 179], [66, 180], [60, 143], [55, 73],
+                [50, 60], [48, 48], [44, 41], [43, 29], [37, 23], [36, -6],
+                [43, -9], [51, 3], [60, 5], [71, -9]
+            ];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Africa - realistic contours
+            ctx.beginPath();
+            points = [
+                [37, -17], [37, 10], [32, 22], [31, 32], [22, 33], [15, 43],
+                [11, 51], [4, 43], [-6, 39], [-11, 40], [-17, 26], [-26, 28],
+                [-29, 32], [-33, 29], [-34, 18], [-28, 15], [-22, 25], [-18, 12],
+                [-12, 18], [-4, 10], [10, -3], [15, -12], [19, -12], [32, -17],
+                [37, -17]
+            ];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Middle East detail
+            ctx.beginPath();
+            points = [
+                [37, 26], [42, 48], [40, 53], [36, 44], [29, 48], [29, 35], [37, 26]
+            ];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Asia - detailed shape
+            ctx.beginPath();
+            points = [
+                [70, 60], [70, 80], [73, 105], [77, 110], [75, 135], [70, 140],
+                [60, 145], [53, 142], [50, 127], [42, 131], [35, 104], [23, 88],
+                [8, 103], [1, 104], [-10, 110], [-11, 120], [20, 121], [25, 114],
+                [38, 122], [43, 131], [50, 127], [53, 142], [60, 145], [70, 140],
+                [75, 135], [77, 110], [73, 105], [70, 80]
+            ];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Australia - accurate shape
+            ctx.beginPath();
+            points = [
+                [-10, 113], [-12, 130], [-17, 136], [-19, 139], [-26, 145],
+                [-33, 138], [-35, 140], [-38, 149], [-37, 153], [-34, 153],
+                [-28, 153], [-24, 154], [-17, 147], [-12, 145], [-10, 143],
+                [-12, 137], [-10, 130], [-10, 113]
+            ];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Draw major shipping lanes
+            ctx.strokeStyle = 'rgba(0, 150, 255, 0.15)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+
+            // Suez Canal route (Asia to Europe)
+            ctx.beginPath();
+            points = [[30, 32], [12, 43], [36, -6], [43, -9], [50, 5]];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Strait of Hormuz (Persian Gulf)
+            ctx.beginPath();
+            const hormuz = toCanvas(26.5, 56.25);
+            ctx.arc(hormuz.x, hormuz.y, 15, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Strait of Malacca (Asia)
+            ctx.beginPath();
+            points = [[1, 104], [8, 103], [20, 121], [35, 104]];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Panama Canal
+            ctx.beginPath();
+            const panama = toCanvas(9, -79.5);
+            ctx.arc(panama.x, panama.y, 12, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Transatlantic route
+            ctx.beginPath();
+            points = [[40, -74], [50, -30], [51, -6]];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Transpacific route (US to Asia)
+            ctx.beginPath();
+            points = [[37, -122], [35, -140], [35, 140], [35, 130]];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Venezuela to China route (for dark fleet monitoring)
+            ctx.beginPath();
+            points = [[10.5, -64], [5, -35], [-10, -25], [-20, 17], [1, 104], [22, 114]];
+            points.forEach((p, i) => {
+                const {x, y} = toCanvas(p[0], p[1]);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+
+            // Add critical region labels
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.5)';
+            ctx.font = '9px Courier New';
+            ctx.textAlign = 'center';
+
+            const labels = [
+                {text: 'STRAIT OF HORMUZ', lat: 26.5, lon: 56.25},
+                {text: 'SUEZ CANAL', lat: 30, lon: 32},
+                {text: 'STRAIT OF MALACCA', lat: 1.5, lon: 103},
+                {text: 'PANAMA CANAL', lat: 9, lon: -79.5},
+                {text: 'PERSIAN GULF', lat: 28, lon: 51}
+            ];
+
+            labels.forEach(label => {
+                const {x, y} = toCanvas(label.lat, label.lon);
+                ctx.fillText(label.text, x, y);
+            });
+
+            ctx.textAlign = 'left';
+        }
+
+        // Update time
+        function updateTime() {
+            const now = new Date();
+            const timeStr = now.toISOString().substr(11, 8) + ' UTC';
+            document.getElementById('currentTime').textContent = timeStr;
+        }
+
+        // State for map highlighting
+        let highlightedLocation = null;
+        let autoHighlightIndex = 0;
+        let autoHighlightItems = [];
+        let lastAutoHighlightUpdate = 0;
+        const AUTO_HIGHLIGHT_INTERVAL = 5000; // Rotate every 5 seconds
+
+        // Track if user is hovering over feed
+        let isHoveringFeed = false;
+        let currentHighlightedFeedItem = null; // Track the currently highlighted feed DOM element
+
+        // Feed activity tracking for status light
+        let lastFeedActivity = Date.now();
+        const FEED_INACTIVE_THRESHOLD = 30000; // 30 seconds without activity = inactive
+
+        // Update feed status light
+        function updateFeedStatusLight() {
+            const statusLight = document.getElementById('feedStatusLight');
+            if (!statusLight) return;
+
+            const timeSinceActivity = Date.now() - lastFeedActivity;
+            if (timeSinceActivity > FEED_INACTIVE_THRESHOLD) {
+                statusLight.classList.add('inactive');
+            } else {
+                statusLight.classList.remove('inactive');
+            }
+        }
+
+        // Update auto-highlight rotation
+        function updateAutoHighlight() {
+            // Only auto-highlight the most recent alert (index 0)
+            if (autoHighlightItems.length > 0 && !isHoveringFeed) {
+                // Always highlight the latest alert (first in array)
+                highlightedLocation = autoHighlightItems[0].location;
+
+                // Highlight the corresponding feed item
+                const targetFeedItem = autoHighlightItems[0].element;
+                setHighlightedFeedItem(targetFeedItem);
+            }
+        }
+
+        // Helper function to set the highlighted feed item
+        function setHighlightedFeedItem(feedItemElement) {
+            // Remove highlight from previous item
+            if (currentHighlightedFeedItem) {
+                currentHighlightedFeedItem.classList.remove('highlighted');
+            }
+
+            // Add highlight to new item
+            if (feedItemElement) {
+                feedItemElement.classList.add('highlighted');
+                currentHighlightedFeedItem = feedItemElement;
+
+                // Scroll the feed item into view instantly for snappier feel
+                feedItemElement.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+            } else {
+                currentHighlightedFeedItem = null;
+            }
+        }
+
+        // Initialize feed with sample data
+        function addFeedItem(text, type = 'normal', source = 'OSINT-AUTO', location = null) {
+            // Update feed activity timestamp
+            lastFeedActivity = Date.now();
+
+            const feedItems = document.getElementById('feedItems');
+            const item = document.createElement('div');
+            item.className = `feed-item ${type}`;
+
+            const timestamp = new Date().toISOString().substr(11, 8);
+
+            item.innerHTML = `
+                <div class="feed-timestamp">${timestamp} UTC</div>
+                <div>${text}</div>
+                <div class="feed-source">SRC: ${source}</div>
+            `;
+
+            // Store location data on the element
+            if (location) {
+                item.dataset.location = JSON.stringify(location);
+
+                // Add hover listeners for map highlighting
+                item.addEventListener('mouseenter', () => {
+                    isHoveringFeed = true;
+                    highlightedLocation = location;
+                    // Highlight this feed item
+                    setHighlightedFeedItem(item);
+                    // Stop auto-rotation while hovering
+                    lastAutoHighlightUpdate = Date.now();
+                });
+
+                item.addEventListener('mouseleave', () => {
+                    isHoveringFeed = false;
+                    // Don't clear highlightedLocation - let auto-highlight take over
+                    // Reset the timer so auto-highlight resumes immediately
+                    lastAutoHighlightUpdate = Date.now() - AUTO_HIGHLIGHT_INTERVAL;
+                });
+            }
+
+            feedItems.insertBefore(item, feedItems.firstChild);
+
+            // Track high-severity items for auto-highlight
+            if (type === 'alert' && location) {
+                autoHighlightItems.unshift({text, location, timestamp, element: item});
+                // Keep only latest 10 alert items
+                if (autoHighlightItems.length > 10) {
+                    autoHighlightItems.pop();
+                }
+
+                // Start auto-highlighting immediately if this is the first alert
+                if (autoHighlightItems.length === 1) {
+                    highlightedLocation = location;
+                    lastAutoHighlightUpdate = Date.now();
+                    setHighlightedFeedItem(item);
+                    console.log('🎯 Starting auto-highlight with first alert');
+                }
+            }
+
+            // Keep only latest 50 items
+            while (feedItems.children.length > 50) {
+                feedItems.removeChild(feedItems.lastChild);
+            }
+        }
+
+        // Plot aircraft on map - dart/arrow shape for radar/ATC style
+        function plotAircraft(aircraft) {
+            aircraft.forEach(ac => {
+                if (!ac.lat || !ac.lon) return;
+
+                // Convert lat/lon to canvas coordinates (with zoom/pan)
+                const { x, y } = mapRenderer.toCanvas(ac.lat, ac.lon);
+
+                // Only draw if on screen
+                if (x < -50 || x > canvas.width + 50 || y < -50 || y > canvas.height + 50) {
+                    return;
+                }
+
+                // Check if this aircraft should be highlighted
+                let isHighlighted = false;
+                if (highlightedLocation) {
+                    if (highlightedLocation.type === 'aircraft' &&
+                        highlightedLocation.aircraftAffected &&
+                        highlightedLocation.aircraftAffected.includes(ac.callsign)) {
+                        isHighlighted = true;
+                    }
+                }
+
+                // Colors
+                const markerColor = isHighlighted ? '#ffffff' : 'rgba(220, 80, 80, 1)';
+
+                // Scale marker size with zoom - minimum 12px for visibility
+                const baseSize = 12;
+                const markerSize = Math.max(12, baseSize * Math.sqrt(mapRenderer.zoom));
+                const headingRad = (ac.heading || 0) * Math.PI / 180 - Math.PI / 2;
+
+                // Draw glow effect if highlighted
+                if (isHighlighted) {
+                    const pulse = Math.sin(Date.now() / 300) * 0.4 + 0.6;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#ff0000';
+                    ctx.globalAlpha = pulse;
+                }
+
+                // Draw aircraft as filled dart/arrow - radar track symbol
+                ctx.strokeStyle = markerColor;
+                ctx.fillStyle = markerColor;
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                ctx.beginPath();
+
+                // Nose (front point) - extends forward
+                const noseX = x + Math.cos(headingRad) * markerSize;
+                const noseY = y + Math.sin(headingRad) * markerSize;
+
+                // Left wing (swept back at 140 degrees from nose)
+                const wingAngle = 2.4; // ~140 degrees
+                const leftWingX = x + Math.cos(headingRad + wingAngle) * markerSize * 0.6;
+                const leftWingY = y + Math.sin(headingRad + wingAngle) * markerSize * 0.6;
+
+                // Tail center (notch behind center)
+                const tailX = x + Math.cos(headingRad + Math.PI) * markerSize * 0.2;
+                const tailY = y + Math.sin(headingRad + Math.PI) * markerSize * 0.2;
+
+                // Right wing (swept back)
+                const rightWingX = x + Math.cos(headingRad - wingAngle) * markerSize * 0.6;
+                const rightWingY = y + Math.sin(headingRad - wingAngle) * markerSize * 0.6;
+
+                ctx.moveTo(noseX, noseY);
+                ctx.lineTo(leftWingX, leftWingY);
+                ctx.lineTo(tailX, tailY);
+                ctx.lineTo(rightWingX, rightWingY);
+                ctx.closePath();
+                ctx.fill();
+
+                // Speed/heading leader line extending from nose
+                const leaderLength = markerSize * 1.2;
+                ctx.globalAlpha = isHighlighted ? 1.0 : 0.5;
+                ctx.beginPath();
+                ctx.moveTo(noseX, noseY);
+                ctx.lineTo(
+                    noseX + Math.cos(headingRad) * leaderLength,
+                    noseY + Math.sin(headingRad) * leaderLength
+                );
+                ctx.stroke();
+
+                // Reset effects
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1.0;
+
+                // Draw callsign label with zoom-scaled font
+                const baseFontSize = isHighlighted ? 10 : 9;
+                const scaledFontSize = Math.max(8, Math.min(16, baseFontSize * Math.sqrt(mapRenderer.zoom)));
+                ctx.fillStyle = isHighlighted ? 'rgba(255, 255, 255, 1)' : 'rgba(220, 80, 80, 0.9)';
+                ctx.font = isHighlighted ? `bold ${scaledFontSize}px Courier New` : `${scaledFontSize}px Courier New`;
+                ctx.fillText(ac.callsign, x + 10, y - 6);
+            });
+        }
+
+        // Plot naval vessels on map
+        function plotNavalVessels(navalData) {
+            if (!navalData) return;
+
+            const allVessels = [
+                ...(navalData.military || []),
+                ...(navalData.tankers || []),
+                ...(navalData.darkFleet || [])
+            ];
+
+            allVessels.forEach(vessel => {
+                if (!vessel.lat || !vessel.lon) return;
+
+                // Convert lat/lon to canvas coordinates (with zoom/pan)
+                const { x, y } = mapRenderer.toCanvas(vessel.lat, vessel.lon);
+
+                // Only draw if on screen
+                if (x < -50 || x > canvas.width + 50 || y < -50 || y > canvas.height + 50) {
+                    return;
+                }
+
+                // Check if this vessel should be highlighted
+                let isHighlighted = false;
+                if (highlightedLocation) {
+                    if (highlightedLocation.type === 'vessel' &&
+                        highlightedLocation.vesselsAffected &&
+                        (highlightedLocation.vesselsAffected.includes(vessel.name) ||
+                         highlightedLocation.vesselsAffected.includes(vessel.mmsi))) {
+                        isHighlighted = true;
+                    }
+                }
+
+                // Choose color based on vessel type
+                let color;
+                let pulseEffect = false;
+
+                if (vessel.darkFleet) {
+                    color = '#ff0040'; // Red for dark fleet
+                    pulseEffect = true;
+                } else if (vessel.type === 'military') {
+                    color = '#00ccff'; // Blue for military
+                } else if (vessel.country === 'Venezuela') {
+                    color = '#ffaa00'; // Orange for Venezuelan tankers
+                } else {
+                    color = '#ffdd44'; // Yellow for other tankers
+                }
+
+                // Draw bright glow effect if highlighted
+                if (isHighlighted) {
+                    const pulse = Math.sin(Date.now() / 200) * 0.5 + 0.5;
+                    ctx.shadowBlur = 30;
+                    ctx.shadowColor = color;
+                    ctx.globalAlpha = pulse * 0.8;
+
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x - 12, y - 12, 24, 24);
+
+                    ctx.shadowBlur = 0;
+                    ctx.globalAlpha = 1.0;
+                }
+
+                // Draw vessel marker (square for ships vs circle for aircraft)
+                ctx.fillStyle = isHighlighted ? '#ffffff' : color;
+                if (pulseEffect && !isHighlighted) {
+                    // Pulsing effect for dark fleet
+                    const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+                    ctx.globalAlpha = pulse;
+                }
+                ctx.fillRect(x - 3, y - 3, 6, 6);
+                ctx.globalAlpha = 1.0;
+
+                // Draw vessel name label with zoom-scaled font
+                const vesselBaseFontSize = isHighlighted ? 9 : 8;
+                const vesselScaledFontSize = Math.max(7, Math.min(14, vesselBaseFontSize * Math.sqrt(mapRenderer.zoom)));
+                ctx.fillStyle = isHighlighted ? '#ffffff' : color;
+                ctx.globalAlpha = isHighlighted ? 1.0 : 0.8;
+                ctx.font = isHighlighted ? `bold ${vesselScaledFontSize}px Courier New` : `${vesselScaledFontSize}px Courier New`;
+                ctx.fillText(vessel.name, x + 5, y - 5);
+                ctx.globalAlpha = 1.0;
+
+                // Draw suspicion score for dark fleet with zoom-scaled font
+                if (vessel.darkFleet && vessel.suspicionScore) {
+                    const scoreScaledFontSize = Math.max(6, Math.min(11, 7 * Math.sqrt(mapRenderer.zoom)));
+                    ctx.fillStyle = isHighlighted ? '#ffffff' : '#ff0040';
+                    ctx.font = `${scoreScaledFontSize}px Courier New`;
+                    ctx.fillText(`[${vessel.suspicionScore}]`, x + 5, y + 5);
+                }
+            });
+        }
+
+        // Draw highlighted area overlay on map
+        function drawHighlightedArea(location) {
+            if (!location || !mapRenderer) return;
+
+            const colors = getThemeColors();
+            const rgb = colors.primaryRgb || (currentTheme === 'mono' ? '255, 255, 255' : '0, 255, 65');
+
+            // Draw area highlight
+            if (location.type === 'area') {
+                const { x, y } = mapRenderer.toCanvas(location.lat, location.lon);
+
+                // Draw pulsing circle for area
+                const pulse = Math.sin(Date.now() / 400) * 0.3 + 0.5;
+                const radiusKm = location.radius || 300;
+                const radiusPixels = (radiusKm / 111) * (canvas.height / 180) * mapRenderer.zoom;
+
+                ctx.strokeStyle = `rgba(${rgb}, ${pulse})`;
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 5]);
+                ctx.beginPath();
+                ctx.arc(x, y, radiusPixels, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Draw label with zoom-scaled font
+                const areaFontSize = Math.max(9, Math.min(16, 11 * Math.sqrt(mapRenderer.zoom)));
+                ctx.fillStyle = `rgba(${rgb}, 0.9)`;
+                ctx.font = `bold ${areaFontSize}px Courier New`;
+                ctx.textAlign = 'center';
+                ctx.fillText(location.region || 'HIGHLIGHTED AREA', x, y - radiusPixels - 10);
+                ctx.textAlign = 'left';
+            } else if (location.type === 'facility') {
+                const { x, y } = mapRenderer.toCanvas(location.lat, location.lon);
+
+                // Draw pulsing crosshair for facility
+                const pulse = Math.sin(Date.now() / 400) * 0.4 + 0.6;
+                ctx.strokeStyle = `rgba(255, 215, 0, ${pulse})`;
+                ctx.lineWidth = 2;
+
+                const size = 15;
+                ctx.beginPath();
+                ctx.moveTo(x - size, y);
+                ctx.lineTo(x + size, y);
+                ctx.moveTo(x, y - size);
+                ctx.lineTo(x, y + size);
+                ctx.stroke();
+
+                // Draw circle
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Draw label with zoom-scaled font
+                const facilityFontSize = Math.max(8, Math.min(14, 10 * Math.sqrt(mapRenderer.zoom)));
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.9)';
+                ctx.font = `bold ${facilityFontSize}px Courier New`;
+                ctx.fillText(location.region || 'FACILITY', x + 20, y);
+            }
+        }
+
+        // Update UI with real data
+        function updateUI(dataFeeds, navalData, installationsData) {
+            // Calculate total assets
+            const aircraftCount = dataFeeds.militaryAircraft.length;
+            const navalCount = navalData ?
+                ((navalData.military || []).length +
+                 (navalData.tankers || []).length +
+                 (navalData.darkFleet || []).length) : 0;
+
+            // Calculate installations counts
+            let nuclearBasesCount = 0;
+            let nuclearAircraftCount = 0;
+            let spaceportsCount = 0;
+
+            if (installationsData) {
+                const bases = installationsData.getMilitaryBases();
+                nuclearBasesCount = bases.filter(b => b.nuclear).length;
+                nuclearAircraftCount = installationsData.getNuclearAircraft().length;
+                spaceportsCount = installationsData.getSpaceports().length;
+            }
+
+            // Update counters
+            document.getElementById('assetCount').textContent = aircraftCount + navalCount + nuclearAircraftCount;
+            document.getElementById('militaryAircraft').textContent = aircraftCount;
+            document.getElementById('navalVessels').textContent = navalCount;
+            document.getElementById('nuclearBases').textContent = nuclearBasesCount;
+            document.getElementById('nuclearAircraft').textContent = nuclearAircraftCount;
+            document.getElementById('spaceports').textContent = spaceportsCount;
+            document.getElementById('patternAlerts').textContent = dataFeeds.patterns.length;
+
+            // Map is continuously redrawn by continuousMapUpdate() for pulsing effects
+
+            // Add news items to feed
+            dataFeeds.newsItems.forEach(news => {
+                const severity = news.severity === 'HIGH' ? 'alert' :
+                                news.severity === 'MEDIUM' ? 'warning' : 'normal';
+                addFeedItem(news.title, severity, news.source, news.location);
+            });
+
+            // Add pattern alerts
+            dataFeeds.patterns.forEach(pattern => {
+                const severity = pattern.severity === 'HIGH' ? 'alert' : 'warning';
+                addFeedItem(pattern.description, severity, 'PATTERN-AI', pattern.location);
+
+                // Show anomaly alert for high severity
+                if (pattern.severity === 'HIGH') {
+                    showAnomalyAlert(pattern.description);
+                }
+            });
+
+            // Add dark fleet alerts to feed
+            if (navalData && navalData.darkFleet) {
+                navalData.darkFleet.forEach(vessel => {
+                    const severity = vessel.suspicionScore >= 90 ? 'alert' : 'warning';
+                    const locationStr = `${vessel.lat.toFixed(2)}°N, ${vessel.lon.toFixed(2)}°E`;
+                    const locationObj = {
+                        lat: vessel.lat,
+                        lon: vessel.lon,
+                        region: vessel.name,
+                        type: 'vessel',
+                        vesselsAffected: [vessel.name, vessel.mmsi]
+                    };
+                    addFeedItem(
+                        `DARK FLEET: ${vessel.name} detected - Suspicion: ${vessel.suspicionScore}/100 - Location: ${locationStr}`,
+                        severity,
+                        'NAVAL-AIS',
+                        locationObj
+                    );
+
+                    // Show indicators for high-risk vessels
+                    if (vessel.suspicionScore >= 90 && vessel.indicators) {
+                        vessel.indicators.slice(0, 2).forEach(indicator => {
+                            addFeedItem(`  └─ ${indicator}`, 'warning', 'INTEL');
+                        });
+                    }
+                });
+            }
+
+            // Add suspicious activity alerts
+            if (navalData && navalData.suspiciousActivity) {
+                navalData.suspiciousActivity.forEach(alert => {
+                    const severity = alert.severity === 'HIGH' ? 'alert' : 'warning';
+                    addFeedItem(alert.description, severity, 'NAVAL-AI');
+                });
+            }
+
+            // Add flight detections to feed (limit to avoid spam)
+            dataFeeds.militaryAircraft.slice(0, 3).forEach(ac => {
+                const locationObj = {
+                    lat: ac.lat,
+                    lon: ac.lon,
+                    region: ac.callsign,
+                    type: 'aircraft',
+                    aircraftAffected: [ac.callsign]
+                };
+                addFeedItem(
+                    `${ac.callsign} tracked at ${ac.lat.toFixed(2)}°N, ${ac.lon.toFixed(2)}°E - Alt: ${Math.round(ac.altitude || 0)}ft`,
+                    'normal',
+                    'ADSB-LIVE',
+                    locationObj
+                );
+            });
+        }
+
+        // Show anomaly alert
+        function showAnomalyAlert(message) {
+            const alert = document.getElementById('anomalyAlert');
+            alert.querySelector('div').textContent = message;
+            alert.style.display = 'block';
+
+            // Hide after 5 seconds
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+
+        // Draw submarine movements on map with trajectory trails
+        function drawSubmarineMovements(submarines, installationsData) {
+            if (!submarines || !mapRenderer) return;
+
+            submarines.forEach(sub => {
+                const {x, y} = mapRenderer.toCanvas(sub.lat, sub.lon);
+
+                // Only draw if on screen
+                if (x < -50 || x > canvas.width + 50 || y < -50 || y > canvas.height + 50) return;
+
+                // Draw trajectory trail first (behind the submarine)
+                if (installationsData && sub.eventId) {
+                    const trail = installationsData.getTrail(sub.eventId);
+                    if (trail && trail.length > 1) {
+                        drawSubmarineTrail(trail);
+                    }
+                }
+
+                // Scale marker size with zoom
+                const baseSize = 4;
+                const markerSize = baseSize * Math.sqrt(mapRenderer.zoom) * 0.7;
+
+                // Simple submarine marker - small diamond shape, no pulse
+                ctx.fillStyle = 'rgba(80, 160, 200, 0.9)'; // Muted cyan
+                ctx.strokeStyle = 'rgba(80, 160, 200, 1)';
+                ctx.lineWidth = Math.max(1, mapRenderer.zoom * 0.3);
+
+                // Diamond shape
+                ctx.beginPath();
+                ctx.moveTo(x, y - markerSize);
+                ctx.lineTo(x + markerSize, y);
+                ctx.lineTo(x, y + markerSize);
+                ctx.lineTo(x - markerSize, y);
+                ctx.closePath();
+                ctx.fill();
+
+                // Draw depth indicator if available
+                if (sub.depth) {
+                    const depthFontSize = Math.max(5, Math.min(8, 6 * Math.sqrt(mapRenderer.zoom)));
+                    ctx.fillStyle = 'rgba(0, 200, 255, 0.7)';
+                    ctx.font = `${depthFontSize}px Courier New`;
+                    ctx.textAlign = 'right';
+                    ctx.fillText(`${sub.depth}m`, x - 10, y + 3);
+                }
+
+                // Draw label
+                const fontSize = Math.max(7, Math.min(11, 9 * Math.sqrt(mapRenderer.zoom)));
+                ctx.fillStyle = 'rgba(0, 200, 255, 1)';
+                ctx.font = `bold ${fontSize}px Courier New`;
+                ctx.textAlign = 'left';
+                ctx.fillText(sub.name, x + 12, y - 4);
+
+                // Type label
+                if (mapRenderer.zoom > 2) {
+                    const typeFontSize = Math.max(6, Math.min(9, 7 * Math.sqrt(mapRenderer.zoom)));
+                    ctx.font = `${typeFontSize}px Courier New`;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    ctx.fillText(`[${sub.type}]`, x + 12, y + 6);
+                }
+
+                // Time remaining indicator
+                if (sub.timeRemaining) {
+                    const hours = Math.floor(sub.timeRemaining / (60 * 60 * 1000));
+                    ctx.fillStyle = hours < 4 ? 'rgba(255, 100, 100, 0.8)' : 'rgba(150, 150, 150, 0.6)';
+                    const timeFontSize = Math.max(5, Math.min(8, 6 * Math.sqrt(mapRenderer.zoom)));
+                    ctx.font = `${timeFontSize}px Courier New`;
+                    ctx.fillText(`[${hours}h remaining]`, x + 12, y + 14);
+                }
+            });
+
+            ctx.textAlign = 'left';
+        }
+
+        // Draw submarine trajectory trail
+        function drawSubmarineTrail(trail) {
+            if (!trail || trail.length < 2) return;
+
+            const trailColor = '80, 160, 200'; // Muted cyan for submarines
+
+            ctx.lineCap = 'round';
+            ctx.setLineDash([4, 3]); // Dashed line for underwater
+
+            for (let i = 1; i < trail.length; i++) {
+                const prev = trail[i - 1];
+                const curr = trail[i];
+                const prevPos = mapRenderer.toCanvas(prev.lat, prev.lon);
+                const currPos = mapRenderer.toCanvas(curr.lat, curr.lon);
+
+                const progress = i / trail.length;
+                const opacity = 0.2 + progress * 0.6;
+
+                ctx.strokeStyle = `rgba(${trailColor}, ${opacity})`;
+                ctx.lineWidth = 1.5;
+
+                ctx.beginPath();
+                ctx.moveTo(prevPos.x, prevPos.y);
+                ctx.lineTo(currPos.x, currPos.y);
+                ctx.stroke();
+            }
+
+            ctx.setLineDash([]);
+        }
+
+        // Update submarine intel panel with current data
+        // Styled to match the Live Intelligence Feed
+        function updateSubmarineIntelPanel(submarines) {
+            if (!submarines) return;
+
+            const listEl = document.getElementById('submarineList');
+            const activeCountEl = document.getElementById('subActiveCount');
+            const nationsCountEl = document.getElementById('subNationsCount');
+
+            if (!listEl) return;
+
+            // Calculate summary stats
+            const nations = new Set(submarines.map(s => s.country));
+
+            // Update summary
+            if (activeCountEl) activeCountEl.textContent = submarines.length;
+            if (nationsCountEl) nationsCountEl.textContent = nations.size;
+
+            // Sort submarines by severity then country
+            const sortedSubs = [...submarines].sort((a, b) => {
+                const severityOrder = { 'HIGH': 0, 'MEDIUM': 1, 'LOW': 2 };
+                const sevCompare = (severityOrder[a.severity] || 2) - (severityOrder[b.severity] || 2);
+                if (sevCompare !== 0) return sevCompare;
+                return a.country.localeCompare(b.country);
+            });
+
+            // Build list HTML - minimal dark style, no emojis
+            let html = '';
+            sortedSubs.forEach(sub => {
+                const countryClass = sub.country.toLowerCase().replace(/\s+/g, '-');
+                const patrolInfo = sub.patrolArea ? ` / ${sub.patrolArea}` : '';
+
+                html += `
+                    <div class="sub-entry ${countryClass}" onclick="panToSubmarine(${sub.lat}, ${sub.lon})">
+                        <div class="sub-entry-name">${sub.name}</div>
+                        <div class="sub-entry-type">${sub.type}${patrolInfo}</div>
+                        <div class="sub-entry-status">${sub.status}</div>
+                    </div>
+                `;
+            });
+
+            listEl.innerHTML = html || '<div style="color: var(--text-dim); font-size: 10px; padding: 20px;">No contacts</div>';
+        }
+
+        // Pan to submarine location when clicked in panel
+        function panToSubmarine(lat, lon) {
+            if (!mapRenderer) return;
+
+            // Calculate pan needed to center on the submarine
+            const targetPoint = mapRenderer.toCanvas(lat, lon);
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            // Adjust pan to center on submarine
+            mapRenderer.panX += centerX - targetPoint.x;
+            mapRenderer.panY += centerY - targetPoint.y;
+
+            // Optionally zoom in if zoomed out
+            if (mapRenderer.zoom < 2) {
+                mapRenderer.zoom = 2.5;
+            }
+
+            updateZoomIndicator();
+        }
+
+        // Draw convoy sightings on map with trajectory trails
+        function drawConvoySightings(convoys, installationsData) {
+            if (!convoys || !mapRenderer) return;
+
+            convoys.forEach(convoy => {
+                const {x, y} = mapRenderer.toCanvas(convoy.lat, convoy.lon);
+
+                // Only draw if on screen
+                if (x < -50 || x > canvas.width + 50 || y < -50 || y > canvas.height + 50) return;
+
+                // Draw trajectory trail first (behind the convoy)
+                if (installationsData && convoy.eventId) {
+                    const trail = installationsData.getTrail(convoy.eventId);
+                    if (trail && trail.length > 1) {
+                        drawConvoyTrail(trail);
+                    }
+                }
+
+                // Scale marker size with zoom
+                const baseSize = 4;
+                const markerSize = baseSize * Math.sqrt(mapRenderer.zoom) * 0.7;
+
+                // Simple convoy marker - small square, no pulse
+                ctx.fillStyle = 'rgba(180, 100, 60, 0.9)'; // Muted orange
+                ctx.strokeStyle = 'rgba(180, 100, 60, 1)';
+                ctx.lineWidth = Math.max(1, mapRenderer.zoom * 0.3);
+
+                // Simple square
+                ctx.fillRect(x - markerSize/2, y - markerSize/2, markerSize, markerSize);
+
+                // Draw label
+                const fontSize = Math.max(7, Math.min(11, 9 * Math.sqrt(mapRenderer.zoom)));
+                ctx.fillStyle = 'rgba(255, 100, 0, 1)';
+                ctx.font = `bold ${fontSize}px Courier New`;
+                ctx.textAlign = 'left';
+                ctx.fillText(convoy.name, x + 14, y - 4);
+
+                if (convoy.route && mapRenderer.zoom > 2) {
+                    const routeFontSize = Math.max(5, Math.min(9, 6 * Math.sqrt(mapRenderer.zoom)));
+                    ctx.font = `${routeFontSize}px Courier New`;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    ctx.fillText(convoy.route, x + 14, y + 6);
+                }
+            });
+
+            ctx.textAlign = 'left';
+        }
+
+        // Draw convoy trajectory trail
+        function drawConvoyTrail(trail) {
+            if (!trail || trail.length < 2) return;
+
+            const trailColor = '180, 100, 60'; // Muted orange for convoys
+
+            ctx.lineCap = 'round';
+
+            for (let i = 1; i < trail.length; i++) {
+                const prev = trail[i - 1];
+                const curr = trail[i];
+                const prevPos = mapRenderer.toCanvas(prev.lat, prev.lon);
+                const currPos = mapRenderer.toCanvas(curr.lat, curr.lon);
+
+                const progress = i / trail.length;
+                const opacity = 0.2 + progress * 0.6;
+
+                ctx.strokeStyle = `rgba(${trailColor}, ${opacity})`;
+                ctx.lineWidth = 1.5;
+
+                ctx.beginPath();
+                ctx.moveTo(prevPos.x, prevPos.y);
+                ctx.lineTo(currPos.x, currPos.y);
+                ctx.stroke();
+            }
+        }
+
+        // Draw base activity indicators - clean style
+        function drawBaseActivityIndicators(activities) {
+            if (!activities || !mapRenderer) return;
+
+            activities.forEach(activity => {
+                const {x, y} = mapRenderer.toCanvas(activity.lat, activity.lon);
+
+                // Only draw if on screen
+                if (x < -50 || x > canvas.width + 50 || y < -50 || y > canvas.height + 50) return;
+
+                // Scale marker size with zoom
+                const baseSize = 5;
+                const markerSize = baseSize * Math.sqrt(mapRenderer.zoom) * 0.7;
+
+                // Simple cross marker for activity - no pulse
+                ctx.strokeStyle = 'rgba(180, 160, 60, 0.8)'; // Muted gold
+                ctx.lineWidth = Math.max(1.5, mapRenderer.zoom * 0.5);
+
+                ctx.beginPath();
+                ctx.moveTo(x - markerSize, y);
+                ctx.lineTo(x + markerSize, y);
+                ctx.moveTo(x, y - markerSize);
+                ctx.lineTo(x, y + markerSize);
+                ctx.stroke();
+
+                // Activity label at higher zoom
+                if (mapRenderer.zoom > 2.5) {
+                    const fontSize = Math.max(6, Math.min(10, 7 * Math.sqrt(mapRenderer.zoom)));
+                    ctx.fillStyle = 'rgba(180, 160, 60, 0.9)';
+                    ctx.font = `${fontSize}px Courier New`;
+                    ctx.textAlign = 'left';
+                    ctx.fillText(activity.name, x + 8, y - 2);
+                }
+            });
+
+            ctx.textAlign = 'left';
+        }
+
+        // Draw exercise areas - clean style
+        function drawExerciseAreas(exercises) {
+            if (!exercises || !mapRenderer) return;
+
+            exercises.forEach(exercise => {
+                const {x, y} = mapRenderer.toCanvas(exercise.lat, exercise.lon);
+
+                // Only draw if on screen
+                if (x < -100 || x > canvas.width + 100 || y < -100 || y > canvas.height + 100) return;
+
+                const areaSize = 25 * mapRenderer.zoom;
+
+                // Simple dashed circle - no pulse
+                ctx.strokeStyle = 'rgba(160, 80, 80, 0.4)'; // Muted red
+                ctx.lineWidth = 1;
+                ctx.setLineDash([6, 4]);
+
+                ctx.beginPath();
+                ctx.arc(x, y, areaSize, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Exercise label
+                const fontSize = Math.max(7, Math.min(11, 8 * Math.sqrt(mapRenderer.zoom)));
+                ctx.fillStyle = 'rgba(160, 80, 80, 0.9)';
+                ctx.font = `${fontSize}px Courier New`;
+                ctx.textAlign = 'center';
+                ctx.fillText(exercise.name, x, y);
+            });
+
+            ctx.textAlign = 'left';
+        }
+
+        // Process nuclear events and add to feed
+        function processNuclearEventsForFeed() {
+            if (!militaryInstallationsData) return;
+
+            const events = militaryInstallationsData.getActiveNuclearEvents();
+
+            events.forEach(event => {
+                // Skip if already processed
+                if (processedNuclearEvents.has(event.id)) return;
+
+                processedNuclearEvents.add(event.id);
+
+                const severity = event.data.severity === 'HIGH' ? 'alert' : 'warning';
+                let message = '';
+                let source = 'NUCLEAR-INTEL';
+
+                switch (event.type) {
+                    case 'aircraft_detection':
+                        message = `☢ NUCLEAR AIRCRAFT: ${event.data.callsign} (${event.data.type}) detected - ${event.data.mission}`;
+                        source = event.data.source || 'ADS-B';
+                        break;
+                    case 'submarine_movement':
+                        message = `☢ SSBN MOVEMENT: ${event.data.name} (${event.data.type}) - ${event.data.status}`;
+                        source = event.data.source || 'OSINT';
+                        break;
+                    case 'convoy_spotted':
+                        message = `☢ NUCLEAR CONVOY: ${event.data.name} spotted - Route: ${event.data.route}`;
+                        source = event.data.source || 'NUKEWATCH';
+                        break;
+                    case 'base_activity':
+                        message = `☢ BASE ACTIVITY: ${event.data.name} - ${event.data.activity}`;
+                        source = event.data.source || 'SATELLITE';
+                        break;
+                    case 'exercise_detected':
+                        message = `☢ NUCLEAR EXERCISE: ${event.data.name} - ${event.data.description}`;
+                        source = event.data.source || 'OFFICIAL';
+                        break;
+                }
+
+                const locationObj = {
+                    lat: event.data.lat,
+                    lon: event.data.lon,
+                    region: event.data.name || event.data.callsign,
+                    type: event.type
+                };
+
+                addFeedItem(message, severity, source, locationObj);
+            });
+
+            // Update event count badge
+            const countBadge = document.getElementById('nuclearEventCount');
+            if (countBadge) {
+                countBadge.textContent = events.length;
+            }
+        }
+
+        // Toggle nuclear layer
+        function toggleNuclearLayer() {
+            nuclearLayerActive = !nuclearLayerActive;
+            const btn = document.getElementById('nuclearToggle');
+
+            if (nuclearLayerActive) {
+                btn.classList.add('active');
+                addFeedItem('☢ Nuclear tracking layer ENABLED - Showing events from last 24h', 'warning', 'SYSTEM');
+            } else {
+                btn.classList.remove('active');
+                addFeedItem('Nuclear tracking layer disabled', 'normal', 'SYSTEM');
+            }
+        }
+
+        // Initialize OSINT Monitor
+        let osintFeeds = null;
+        let navalTracking = null;
+        let currentNavalData = null;
+        let conflictZonesData = null;
+        let militaryInstallationsData = null;
+
+        // Continuous map redraw for pulsing effects
+        let frameCount = 0;
+        function continuousMapUpdate() {
+            frameCount++;
+
+            // Update auto-highlight rotation
+            updateAutoHighlight();
+
+            // Update feed status light
+            updateFeedStatusLight();
+
+            // Only log every 300 frames (roughly every 5 seconds)
+            if (frameCount % 300 === 0) {
+                console.log(`🔄 Frame ${frameCount}: osintFeeds=${!!osintFeeds}, navalData=${!!currentNavalData}, mapRenderer=${!!mapRenderer}, countries=${mapRenderer ? !!mapRenderer.countries : false}`);
+            }
+
+            if (osintFeeds && currentNavalData) {
+                drawWorldMap();
+
+                // Draw military installations (bases, facilities, spaceports) - always visible but nuclear-specific items depend on toggle
+                if (militaryInstallationsData && mapRenderer) {
+                    // Draw non-nuclear installations (spaceports always visible)
+                    mapRenderer.drawSpaceports(militaryInstallationsData.getSpaceports(), mapRenderer.colors.primaryRgb);
+
+                    // Only draw nuclear layer if toggle is active
+                    if (nuclearLayerActive) {
+                        const nuclearData = militaryInstallationsData.getActiveNuclearData();
+
+                        // Draw nuclear bases with pulsing indicators
+                        const nuclearBases = militaryInstallationsData.getMilitaryBases().filter(b => b.nuclear);
+                        mapRenderer.drawMilitaryBases(nuclearBases, mapRenderer.colors.primaryRgb);
+
+                        // Draw nuclear facilities
+                        mapRenderer.drawNuclearFacilities(militaryInstallationsData.getNuclearFacilities(), mapRenderer.colors.primaryRgb);
+
+                        // Draw active nuclear aircraft detections with trajectory trails
+                        mapRenderer.drawNuclearAircraft(nuclearData.aircraft, militaryInstallationsData);
+
+                        // Draw submarine movements with trajectory trails
+                        mapRenderer.drawSubmarines(nuclearData.submarines, militaryInstallationsData);
+                        updateSubmarineIntelPanel(nuclearData.submarines);
+
+                        // Draw convoy sightings with trajectory trails
+                        drawConvoySightings(nuclearData.convoys, militaryInstallationsData);
+
+                        // Draw base activity indicators
+                        drawBaseActivityIndicators(nuclearData.baseActivity);
+
+                        // Draw exercise areas
+                        drawExerciseAreas(nuclearData.exercises);
+                    }
+                }
+
+                // Draw highlighted area overlay if active
+                if (highlightedLocation) {
+                    drawHighlightedArea(highlightedLocation);
+                }
+
+                plotAircraft(osintFeeds.militaryAircraft);
+                plotNavalVessels(currentNavalData);
+
+                // Draw ruler mode overlays (after everything else so they're on top)
+                if (rulerModeActive) {
+                    drawCrosshairs();
+                    drawRulerBorder();
+                }
+            } else if (mapRenderer && mapRenderer.countries) {
+                // Draw map even if we don't have aircraft/naval data yet
+                drawWorldMap();
+
+                // Draw spaceports always, nuclear data only when toggled
+                if (militaryInstallationsData && mapRenderer) {
+                    mapRenderer.drawSpaceports(militaryInstallationsData.getSpaceports(), mapRenderer.colors.primaryRgb);
+
+                    if (nuclearLayerActive) {
+                        const nuclearData = militaryInstallationsData.getActiveNuclearData();
+                        const nuclearBases = militaryInstallationsData.getMilitaryBases().filter(b => b.nuclear);
+                        mapRenderer.drawMilitaryBases(nuclearBases, mapRenderer.colors.primaryRgb);
+                        mapRenderer.drawNuclearFacilities(militaryInstallationsData.getNuclearFacilities(), mapRenderer.colors.primaryRgb);
+                        mapRenderer.drawNuclearAircraft(nuclearData.aircraft, militaryInstallationsData);
+                        mapRenderer.drawSubmarines(nuclearData.submarines, militaryInstallationsData);
+                        drawConvoySightings(nuclearData.convoys, militaryInstallationsData);
+                        drawBaseActivityIndicators(nuclearData.baseActivity);
+                        drawExerciseAreas(nuclearData.exercises);
+                    }
+                }
+
+                // Draw highlighted area overlay if active
+                if (highlightedLocation) {
+                    drawHighlightedArea(highlightedLocation);
+                }
+
+                // Draw ruler mode overlays
+                if (rulerModeActive) {
+                    drawCrosshairs();
+                    drawRulerBorder();
+                }
+            }
+
+            requestAnimationFrame(continuousMapUpdate);
+        }
+
+        // Mouse tracking for tooltips
+        const tooltip = document.getElementById('assetTooltip');
+        let hoveredAsset = null;
+        let hoveredShippingLane = null; // Track hovered shipping lane for rendering
+        let lastMouseX = 0, lastMouseY = 0; // Track mouse position for card rendering
+
+        // Update zoom indicator
+        function updateZoomIndicator() {
+            const zoomLevel = document.getElementById('zoomLevel');
+            if (mapRenderer) {
+                zoomLevel.textContent = `ZOOM: ${mapRenderer.zoom.toFixed(1)}x`;
+            }
+        }
+
+        // Zoom controls
+        document.getElementById('zoomIn').addEventListener('click', () => {
+            if (mapRenderer) {
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                mapRenderer.handleWheel({preventDefault: () => {}, deltaY: -100}, centerX, centerY);
+                updateZoomIndicator();
+            }
+        });
+
+        document.getElementById('zoomOut').addEventListener('click', () => {
+            if (mapRenderer) {
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                mapRenderer.handleWheel({preventDefault: () => {}, deltaY: 100}, centerX, centerY);
+                updateZoomIndicator();
+            }
+        });
+
+        document.getElementById('zoomReset').addEventListener('click', () => {
+            if (mapRenderer) {
+                mapRenderer.resetView();
+                updateZoomIndicator();
+            }
+        });
+
+        // Ruler mode toggle
+        document.getElementById('rulerMode').addEventListener('click', () => {
+            rulerModeActive = !rulerModeActive;
+            const btn = document.getElementById('rulerMode');
+            const coordDisplay = document.getElementById('coordinateDisplay');
+
+            if (rulerModeActive) {
+                btn.classList.add('active');
+                coordDisplay.classList.add('visible');
+                addFeedItem('Coordinate tracking mode ENABLED', 'normal', 'SYSTEM');
+            } else {
+                btn.classList.remove('active');
+                coordDisplay.classList.remove('visible');
+                cursorOnMap = false;
+            }
+        });
+
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+        // Set correct button text based on saved theme
+        if (currentTheme === 'mono') {
+            document.getElementById('themeToggle').textContent = '◐ GREEN';
+        }
+
+        // Nuclear layer toggle
+        document.getElementById('nuclearToggle').addEventListener('click', toggleNuclearLayer);
+
+        // Data panel collapse toggle
+        document.getElementById('dataPanelHeader').addEventListener('click', () => {
+            const panel = document.getElementById('dataPanel');
+            panel.classList.toggle('collapsed');
+
+            // Trigger canvas resize to use the new space
+            setTimeout(() => {
+                resizeCanvas();
+            }, 350); // Wait for animation to complete
+        });
+
+        // Submarine intel panel collapse toggle
+        document.getElementById('subIntelHeader').addEventListener('click', () => {
+            const panel = document.getElementById('submarineIntelPanel');
+            const tab = document.getElementById('subPanelTab');
+            panel.classList.add('collapsed');
+            tab.classList.remove('hidden');
+        });
+
+        // Click tab to reopen submarine panel
+        document.getElementById('subPanelTab').addEventListener('click', () => {
+            const panel = document.getElementById('submarineIntelPanel');
+            const tab = document.getElementById('subPanelTab');
+            panel.classList.remove('collapsed');
+            tab.classList.add('hidden');
+        });
+
+        // Mouse wheel zoom
+        canvas.addEventListener('wheel', (e) => {
+            if (mapRenderer) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                mapRenderer.handleWheel(e, mouseX, mouseY);
+                updateZoomIndicator();
+            }
+        }, { passive: false });
+
+        // Mouse drag for panning
+        canvas.addEventListener('mousedown', (e) => {
+            if (mapRenderer) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                mapRenderer.handleMouseDown(e, mouseX, mouseY);
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (mapRenderer) {
+                mapRenderer.handleMouseUp();
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Update cursor position for ruler mode
+            cursorX = mouseX;
+            cursorY = mouseY;
+            cursorOnMap = true;
+
+            // Update coordinate display in real-time
+            if (rulerModeActive) {
+                updateCoordinateDisplay(mouseX, mouseY);
+            }
+
+            // Handle panning
+            if (mapRenderer && mapRenderer.handleMouseMove(mouseX, mouseY)) {
+                // Panning occurred, cursor style will be set below
+            }
+
+            // Find nearby assets
+            hoveredAsset = null;
+
+            // Check aircraft
+            if (osintFeeds && osintFeeds.militaryAircraft && mapRenderer) {
+                for (const ac of osintFeeds.militaryAircraft) {
+                    if (!ac.lat || !ac.lon) continue;
+                    const { x, y } = mapRenderer.toCanvas(ac.lat, ac.lon);
+                    const distance = Math.sqrt(Math.pow(mouseX - x, 2) + Math.pow(mouseY - y, 2));
+
+                    if (distance < 10) {
+                        hoveredAsset = {type: 'aircraft', data: ac};
+                        break;
+                    }
+                }
+            }
+
+            // Check naval vessels
+            if (!hoveredAsset && currentNavalData && mapRenderer) {
+                const allVessels = [
+                    ...(currentNavalData.military || []),
+                    ...(currentNavalData.tankers || []),
+                    ...(currentNavalData.darkFleet || [])
+                ];
+
+                for (const vessel of allVessels) {
+                    if (!vessel.lat || !vessel.lon) continue;
+                    const { x, y } = mapRenderer.toCanvas(vessel.lat, vessel.lon);
+                    const distance = Math.sqrt(Math.pow(mouseX - x, 2) + Math.pow(mouseY - y, 2));
+
+                    if (distance < 10) {
+                        hoveredAsset = {type: 'vessel', data: vessel};
+                        break;
+                    }
+                }
+            }
+
+            // Check military installations (bases, facilities, spaceports)
+            if (!hoveredAsset && militaryInstallationsData && mapRenderer) {
+                const visible = militaryInstallationsData.getVisibleInstallations(mapRenderer.zoom);
+
+                // Check bases
+                for (const base of visible.bases) {
+                    const { x, y } = mapRenderer.toCanvas(base.lat, base.lon);
+                    const distance = Math.sqrt(Math.pow(mouseX - x, 2) + Math.pow(mouseY - y, 2));
+                    if (distance < 12) {
+                        hoveredAsset = {type: 'military_base', data: base};
+                        break;
+                    }
+                }
+
+                // Check nuclear facilities
+                if (!hoveredAsset) {
+                    for (const facility of visible.facilities) {
+                        const { x, y } = mapRenderer.toCanvas(facility.lat, facility.lon);
+                        const distance = Math.sqrt(Math.pow(mouseX - x, 2) + Math.pow(mouseY - y, 2));
+                        if (distance < 12) {
+                            hoveredAsset = {type: 'nuclear_facility', data: facility};
+                            break;
+                        }
+                    }
+                }
+
+                // Check spaceports
+                if (!hoveredAsset) {
+                    for (const port of visible.spaceports) {
+                        const { x, y } = mapRenderer.toCanvas(port.lat, port.lon);
+                        const distance = Math.sqrt(Math.pow(mouseX - x, 2) + Math.pow(mouseY - y, 2));
+                        if (distance < 12) {
+                            hoveredAsset = {type: 'spaceport', data: port};
+                            break;
+                        }
+                    }
+                }
+
+                // Check nuclear aircraft (only when layer is active)
+                if (!hoveredAsset && nuclearLayerActive) {
+                    const nuclearAircraft = militaryInstallationsData.getNuclearAircraft();
+                    for (const ac of nuclearAircraft) {
+                        const { x, y } = mapRenderer.toCanvas(ac.lat, ac.lon);
+                        const distance = Math.sqrt(Math.pow(mouseX - x, 2) + Math.pow(mouseY - y, 2));
+                        if (distance < 12) {
+                            hoveredAsset = {type: 'nuclear_aircraft', data: ac};
+                            break;
+                        }
+                    }
+                }
+
+                // Check submarines (only when layer is active)
+                if (!hoveredAsset && nuclearLayerActive) {
+                    const submarines = militaryInstallationsData.getActiveSubmarineMovements();
+                    for (const sub of submarines) {
+                        const { x, y } = mapRenderer.toCanvas(sub.lat, sub.lon);
+                        const distance = Math.sqrt(Math.pow(mouseX - x, 2) + Math.pow(mouseY - y, 2));
+                        if (distance < 15) {
+                            hoveredAsset = {type: 'submarine', data: sub};
+                            break;
+                        }
+                    }
+                }
+
+                // Check convoys (only when layer is active)
+                if (!hoveredAsset && nuclearLayerActive) {
+                    const convoys = militaryInstallationsData.getActiveConvoySightings();
+                    for (const convoy of convoys) {
+                        const { x, y } = mapRenderer.toCanvas(convoy.lat, convoy.lon);
+                        const distance = Math.sqrt(Math.pow(mouseX - x, 2) + Math.pow(mouseY - y, 2));
+                        if (distance < 15) {
+                            hoveredAsset = {type: 'convoy', data: convoy};
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Check cities (only if no asset is hovered)
+            if (!hoveredAsset && conflictZonesData && mapRenderer) {
+                const cities = conflictZonesData.getVisibleCities(mapRenderer.zoom);
+                for (const city of cities) {
+                    const { x, y } = mapRenderer.toCanvas(city.lat, city.lon);
+                    const distance = Math.sqrt(Math.pow(mouseX - x, 2) + Math.pow(mouseY - y, 2));
+
+                    if (distance < 8) {
+                        hoveredAsset = {type: 'city', data: city};
+                        break;
+                    }
+                }
+            }
+
+            // Check battle zones (only if no asset is hovered and zoom > 3.0)
+            if (!hoveredAsset && conflictZonesData && mapRenderer && mapRenderer.zoom > 3.0) {
+                const conflicts = conflictZonesData.getVisibleConflicts(mapRenderer.zoom);
+                for (const conflict of conflicts) {
+                    const battleZones = conflictZonesData.getVisibleBattleZones(mapRenderer.zoom, conflict);
+                    for (const zone of battleZones) {
+                        const { x, y } = mapRenderer.toCanvas(zone.center[0], zone.center[1]);
+                        const distance = Math.sqrt(Math.pow(mouseX - x, 2) + Math.pow(mouseY - y, 2));
+
+                        if (distance < 10) {
+                            hoveredAsset = {type: 'battlezone', data: zone};
+                            break;
+                        }
+                    }
+                    if (hoveredAsset) break;
+                }
+            }
+
+            // Preload news for nearby shipping lanes (before direct hover check)
+            if (mapRenderer && mapRenderer.preloadNearbyShippingLaneNews) {
+                mapRenderer.preloadNearbyShippingLaneNews(mouseX, mouseY);
+            }
+
+            // Check shipping lanes (only if no asset is hovered)
+            if (!hoveredAsset && mapRenderer) {
+                const lane = mapRenderer.getShippingLaneAtPoint(mouseX, mouseY);
+                if (lane !== hoveredShippingLane) {
+                    hoveredShippingLane = lane;
+                }
+                if (lane) {
+                    hoveredAsset = {type: 'shipping_lane', data: lane};
+                }
+            } else if (!hoveredAsset) {
+                hoveredShippingLane = null;
+            }
+
+            // Track mouse position for shipping lane card
+            lastMouseX = mouseX;
+            lastMouseY = mouseY;
+
+            // Check conflict zones (only if no asset is hovered)
+            if (!hoveredAsset && conflictZonesData && mapRenderer) {
+                const { lat, lon } = mapRenderer.toLatLon(mouseX, mouseY);
+                const conflictZone = conflictZonesData.getConflictZoneAtPoint(lat, lon);
+
+                if (conflictZone) {
+                    hoveredAsset = {type: 'conflict', data: conflictZone};
+                }
+            }
+
+            // Check country hover (only if no asset is hovered)
+            if (!hoveredAsset && mapRenderer) {
+                const country = mapRenderer.getCountryAtPoint(mouseX, mouseY);
+                if (country !== mapRenderer.hoveredCountry) {
+                    mapRenderer.hoveredCountry = country;
+                    // Map will be redrawn by continuousMapUpdate
+                }
+
+                if (country) {
+                    hoveredAsset = {type: 'country', data: country};
+                }
+            } else if (mapRenderer && mapRenderer.hoveredCountry) {
+                // Clear country hover if hovering over asset
+                mapRenderer.hoveredCountry = null;
+            }
+
+            // Show/hide tooltip
+            if (hoveredAsset) {
+                canvas.style.cursor = mapRenderer && mapRenderer.isDragging ? 'grabbing' : 'pointer';
+                showTooltip(hoveredAsset, e.clientX, e.clientY);
+            } else {
+                if (mapRenderer && mapRenderer.isDragging) {
+                    canvas.style.cursor = 'grabbing';
+                } else {
+                    canvas.style.cursor = 'grab';
+                }
+                tooltip.classList.remove('visible');
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            tooltip.classList.remove('visible');
+            hoveredAsset = null;
+            hoveredShippingLane = null;
+            cursorOnMap = false;
+            if (mapRenderer) {
+                mapRenderer.hoveredCountry = null;
+            }
+        });
+
+        /**
+         * Generate news HTML for a conflict zone tooltip
+         */
+        function getZoneNewsHtml(zoneName) {
+            if (!window.conflictNewsService) {
+                return '';
+            }
+
+            const news = window.conflictNewsService.getCachedNews(zoneName);
+
+            if (news === null) {
+                // News is being fetched
+                return `
+                    <div class="tooltip-news">
+                        <div class="tooltip-news-header">INTEL FEED</div>
+                        <div class="tooltip-news-loading">Loading...</div>
+                    </div>
+                `;
+            }
+
+            if (news.length === 0) {
+                return '';
+            }
+
+            // Show top 3 news items
+            const newsItems = news.slice(0, 3).map(item => `
+                <div class="tooltip-news-item">
+                    <div class="tooltip-news-title">${item.title.substring(0, 80)}${item.title.length > 80 ? '...' : ''}</div>
+                    <div class="tooltip-news-meta">${item.source} / ${item.timeAgo}</div>
+                </div>
+            `).join('');
+
+            return `
+                <div class="tooltip-news">
+                    <div class="tooltip-news-header">INTEL FEED</div>
+                    ${newsItems}
+                </div>
+            `;
+        }
+
+        function showTooltip(asset, x, y) {
+            let html = '';
+
+            if (asset.type === 'aircraft') {
+                const ac = asset.data;
+                html = `
+                    <div class="tooltip-header">${ac.callsign || 'UNKNOWN'}</div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Type</span>
+                        <span>Military Aircraft</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Position</span>
+                        <span>${ac.lat.toFixed(2)}°N, ${ac.lon.toFixed(2)}°E</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Altitude</span>
+                        <span>${Math.round(ac.altitude || 0)} ft</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Speed</span>
+                        <span>${Math.round(ac.velocity || 0)} kts</span>
+                    </div>
+                    ${ac.heading ? `<div class="tooltip-row">
+                        <span class="tooltip-label">Heading</span>
+                        <span>${Math.round(ac.heading)}°</span>
+                    </div>` : ''}
+                `;
+            } else if (asset.type === 'vessel') {
+                const vessel = asset.data;
+                html = `
+                    <div class="tooltip-header">${vessel.name}</div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Type</span>
+                        <span>${vessel.category || vessel.type}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Country</span>
+                        <span>${vessel.country}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Position</span>
+                        <span>${vessel.lat.toFixed(2)}°N, ${vessel.lon.toFixed(2)}°E</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Status</span>
+                        <span>${vessel.status || 'Active'}</span>
+                    </div>
+                    ${vessel.speed ? `<div class="tooltip-row">
+                        <span class="tooltip-label">Speed</span>
+                        <span>${vessel.speed} kts</span>
+                    </div>` : ''}
+                    ${vessel.darkFleet ? `<div class="tooltip-alert">
+                        DARK FLEET ${vessel.suspicionScore}/100
+                    </div>` : ''}
+                `;
+            } else if (asset.type === 'city') {
+                const city = asset.data;
+                html = `
+                    <div class="tooltip-header">${city.name}</div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Country</span>
+                        <span>${city.country}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Population</span>
+                        <span>${(city.population / 1000000).toFixed(2)}M</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Position</span>
+                        <span>${city.lat.toFixed(2)}°N, ${city.lon.toFixed(2)}°E</span>
+                    </div>
+                    ${city.strategic ? `<div class="tooltip-alert" style="color: #ffd700;">
+                        STRATEGIC
+                    </div>` : ''}
+                `;
+            } else if (asset.type === 'battlezone') {
+                const zone = asset.data;
+                const intensityColor = zone.intensity === 'extreme' ? '#ff1493' :
+                                      zone.intensity === 'high' ? '#ff1493' :
+                                      zone.intensity === 'medium' ? '#ff69b4' : '#ffb6c1';
+                // Get news for this zone
+                const newsHtml = getZoneNewsHtml(zone.name);
+                html = `
+                    <div class="tooltip-header" style="border-bottom-color: ${intensityColor};">${zone.name}</div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Type</span>
+                        <span>${zone.type.replace(/_/g, ' ').toUpperCase()}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Status</span>
+                        <span>${zone.status}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Intensity</span>
+                        <span style="color: ${intensityColor};">${zone.intensity.toUpperCase()}</span>
+                    </div>
+                    ${zone.since ? `<div class="tooltip-row">
+                        <span class="tooltip-label">Since</span>
+                        <span>${zone.since}</span>
+                    </div>` : ''}
+                    ${zone.strategic ? `<div class="tooltip-alert" style="color: #ffd700;">
+                        STRATEGIC
+                    </div>` : ''}
+                    ${zone.liberated ? `<div class="tooltip-alert" style="color: var(--primary);">
+                        LIBERATED
+                    </div>` : ''}
+                    ${newsHtml}
+                `;
+            } else if (asset.type === 'conflict') {
+                const conflictData = asset.data;
+                if (conflictData.type === 'active') {
+                    const conflict = conflictData.conflict;
+                    const territory = conflictData.territory;
+                    html = `
+                        <div class="tooltip-header">${conflict.name}</div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Region</span>
+                            <span>${territory.region}</span>
+                        </div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Status</span>
+                            <span>${territory.status.toUpperCase()}</span>
+                        </div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Since</span>
+                            <span>${territory.since}</span>
+                        </div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Severity</span>
+                            <span>${conflict.severity}</span>
+                        </div>
+                        <div class="tooltip-alert">
+                            ACTIVE CONFLICT
+                        </div>
+                    `;
+                } else if (conflictData.type === 'potential') {
+                    const potential = conflictData.conflict;
+                    html = `
+                        <div class="tooltip-header">${potential.name}</div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Region</span>
+                            <span>${potential.region}</span>
+                        </div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Tension</span>
+                            <span>${potential.tensionLevel}</span>
+                        </div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Info</span>
+                            <span>${potential.description}</span>
+                        </div>
+                        <div class="tooltip-alert" style="color: #ffa500;">
+                            POTENTIAL CONFLICT
+                        </div>
+                    `;
+                }
+            } else if (asset.type === 'military_base') {
+                const base = asset.data;
+                html = `
+                    <div class="tooltip-header">${base.name}</div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Country</span>
+                        <span>${base.country}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Type</span>
+                        <span>${base.type.replace('_', ' ').toUpperCase()}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Position</span>
+                        <span>${base.lat.toFixed(2)}°N, ${base.lon.toFixed(2)}°E</span>
+                    </div>
+                    ${base.category ? `<div class="tooltip-row">
+                        <span class="tooltip-label">Category</span>
+                        <span>${base.category}</span>
+                    </div>` : ''}
+                    ${base.nuclear ? `<div class="tooltip-alert" style="color: #ffc800;">
+                        NUCLEAR CAPABLE
+                    </div>` : ''}
+                `;
+            } else if (asset.type === 'nuclear_facility') {
+                const facility = asset.data;
+                const statusColor = facility.status === 'active' ? 'var(--primary)' :
+                                   facility.status === 'occupied' ? '#ff1493' :
+                                   facility.status === 'suspected' ? '#ffc800' : '#888';
+                html = `
+                    <div class="tooltip-header">${facility.name}</div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Country</span>
+                        <span>${facility.country}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Type</span>
+                        <span>${facility.type.replace('_', ' ').toUpperCase()}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Status</span>
+                        <span style="color: ${statusColor};">${facility.status.toUpperCase()}</span>
+                    </div>
+                    ${facility.capacity ? `<div class="tooltip-row">
+                        <span class="tooltip-label">Capacity</span>
+                        <span>${facility.capacity}</span>
+                    </div>` : ''}
+                    <div class="tooltip-alert" style="color: #ff6600;">
+                        NUCLEAR
+                    </div>
+                `;
+            } else if (asset.type === 'spaceport') {
+                const port = asset.data;
+                html = `
+                    <div class="tooltip-header">${port.name}</div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Country</span>
+                        <span>${port.country}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Operator</span>
+                        <span>${port.operator}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Type</span>
+                        <span>${port.type.toUpperCase()}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Launches 2024</span>
+                        <span style="color: #00bfff;">${port.launches2024}</span>
+                    </div>
+                `;
+            } else if (asset.type === 'submarine') {
+                const sub = asset.data;
+                const timeRemaining = sub.timeRemaining ? Math.floor(sub.timeRemaining / (60 * 60 * 1000)) : '?';
+                html = `
+                    <div class="tooltip-header" style="border-bottom-color: #00c8ff;">${sub.name}</div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Type</span>
+                        <span>${sub.type}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Country</span>
+                        <span>${sub.country}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Position</span>
+                        <span>${sub.lat.toFixed(2)}°N, ${sub.lon.toFixed(2)}°E</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Status</span>
+                        <span>${sub.status}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Expires</span>
+                        <span style="color: ${timeRemaining < 4 ? '#ff6464' : '#64ff64'};">${timeRemaining}h</span>
+                    </div>
+                    <div class="tooltip-alert" style="color: #00c8ff;">
+                        SSBN MOVEMENT
+                    </div>
+                `;
+            } else if (asset.type === 'convoy') {
+                const convoy = asset.data;
+                const timeRemaining = convoy.timeRemaining ? Math.floor(convoy.timeRemaining / (60 * 60 * 1000)) : '?';
+                html = `
+                    <div class="tooltip-header" style="border-bottom-color: #ff6400;">${convoy.name}</div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Type</span>
+                        <span>${convoy.type}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Country</span>
+                        <span>${convoy.country}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Position</span>
+                        <span>${convoy.lat.toFixed(2)}°N, ${convoy.lon.toFixed(2)}°E</span>
+                    </div>
+                    ${convoy.route ? `<div class="tooltip-row">
+                        <span class="tooltip-label">Route</span>
+                        <span>${convoy.route}</span>
+                    </div>` : ''}
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Expires</span>
+                        <span style="color: ${timeRemaining < 4 ? '#ff6464' : '#64ff64'};">${timeRemaining}h</span>
+                    </div>
+                    <div class="tooltip-alert" style="color: #ff6400;">
+                        NUCLEAR CONVOY
+                    </div>
+                `;
+            } else if (asset.type === 'nuclear_aircraft') {
+                const ac = asset.data;
+                const roleColor = ac.nuclear ? '#ff1493' : ac.nuclearC2 ? '#ffc800' : '#ff9632';
+                const roleText = ac.nuclear ? 'NUCLEAR STRIKE' : ac.nuclearC2 ? 'NUCLEAR C2' : 'SUPPORT';
+                const timeRemaining = ac.timeRemaining ? Math.floor(ac.timeRemaining / (60 * 60 * 1000)) : '?';
+                html = `
+                    <div class="tooltip-header" style="border-bottom-color: ${roleColor};">${ac.callsign}</div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Aircraft</span>
+                        <span>${ac.type}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Country</span>
+                        <span>${ac.country}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Position</span>
+                        <span>${ac.lat.toFixed(2)}°N, ${ac.lon.toFixed(2)}°E</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Altitude</span>
+                        <span>${ac.altitude.toLocaleString()} ft</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Speed</span>
+                        <span>${ac.speed} kts</span>
+                    </div>
+                    ${ac.mission ? `<div class="tooltip-row">
+                        <span class="tooltip-label">Mission</span>
+                        <span>${ac.mission}</span>
+                    </div>` : ''}
+                    <div class="tooltip-row">
+                        <span class="tooltip-label">Expires</span>
+                        <span style="color: ${timeRemaining < 4 ? '#ff6464' : '#64ff64'};">${timeRemaining}h</span>
+                    </div>
+                    <div class="tooltip-alert" style="color: ${roleColor};">
+                        ${roleText}
+                    </div>
+                `;
+            } else if (asset.type === 'shipping_lane') {
+                // Shipping lane tooltip is drawn directly on canvas, so we hide the HTML tooltip
+                tooltip.classList.remove('visible');
+                return;
+            } else if (asset.type === 'country') {
+                const country = asset.data;
+                const countryName = country.properties.name;
+                const countryCode = country.id || '';
+                html = `
+                    <div class="tooltip-header">${countryName}</div>
+                    ${countryCode ? `<div class="tooltip-row">
+                        <span class="tooltip-label">Code</span>
+                        <span>${countryCode}</span>
+                    </div>` : ''}
+                `;
+            }
+
+            tooltip.innerHTML = html;
+            tooltip.style.left = (x + 15) + 'px';
+            tooltip.style.top = (y - 15) + 'px';
+            tooltip.classList.add('visible');
+        }
+
+        window.addEventListener('load', async () => {
+            updateTime();
+            setInterval(updateTime, 1000);
+
+            // Add initial feed items
+            addFeedItem('OSINT Situation Monitor initialized', 'normal', 'SYSTEM');
+            addFeedItem('Loading world map data...', 'normal', 'SYSTEM');
+
+            // Debug canvas
+            console.log('🖼️ Canvas element:', canvas);
+            console.log('🖼️ Canvas initial dimensions:', canvas.width, 'x', canvas.height);
+            console.log('🖼️ Canvas offset dimensions:', canvas.offsetWidth, 'x', canvas.offsetHeight);
+            console.log('🖼️ Context 2D:', ctx);
+
+            // Initialize and load GeoJSON map
+            mapRenderer = new GeoJSONMapRenderer(canvas, ctx);
+            // Apply saved theme colors immediately
+            mapRenderer.updateThemeColors(getThemeColors());
+            const loaded = await mapRenderer.loadCountries();
+
+            if (loaded) {
+                addFeedItem('World map loaded successfully', 'normal', 'SYSTEM');
+                console.log('✅ Map loaded, about to resize canvas...');
+            } else {
+                addFeedItem('Map load failed - using fallback', 'warning', 'SYSTEM');
+            }
+
+            resizeCanvas();
+            console.log('✅ Canvas resized to:', canvas.width, 'x', canvas.height);
+
+            // Draw the map immediately after loading
+            console.log('🗺️ Drawing initial map...');
+            drawWorldMap();
+
+            addFeedItem('Monitoring global military movements', 'normal', 'SYSTEM');
+            addFeedItem('Pattern recognition engine active', 'normal', 'SYSTEM');
+            addFeedItem('Naval tracking system initializing...', 'normal', 'SYSTEM');
+            addFeedItem('Dark fleet detection enabled', 'normal', 'SYSTEM');
+            addFeedItem('Maritime shipping lanes tracking ACTIVE', 'normal', 'SYSTEM');
+            addFeedItem('Loading military installations database...', 'normal', 'SYSTEM');
+
+            // Initialize data feeds
+            osintFeeds = new OSINTDataFeeds();
+            navalTracking = new NavalTrackingSystem();
+            conflictZonesData = new ConflictZonesData();
+            militaryInstallationsData = new MilitaryInstallationsData();
+
+            // Start position tracking for trajectory trails
+            militaryInstallationsData.startPositionTracking();
+
+            // Log installations data loaded
+            const installationsStats = militaryInstallationsData.getAllData();
+            addFeedItem(`Military bases loaded: ${installationsStats.bases.length}`, 'normal', 'SYSTEM');
+            addFeedItem(`Nuclear facilities tracked: ${installationsStats.facilities.length}`, 'normal', 'SYSTEM');
+            addFeedItem(`Spaceports monitored: ${installationsStats.spaceports.length}`, 'normal', 'SYSTEM');
+            addFeedItem(`Nuclear aircraft tracking ACTIVE`, 'warning', 'SYSTEM');
+
+            // Start both tracking systems
+            await osintFeeds.startFeeds();
+            await navalTracking.startTracking();
+
+            // Get initial naval data
+            currentNavalData = await navalTracking.fetchNavalData();
+
+            // Initial UI update
+            setTimeout(() => {
+                updateUI(osintFeeds, currentNavalData, militaryInstallationsData);
+            }, 2000);
+
+            // Start continuous map animation for pulsing effects
+            console.log('🔄 Starting continuous map update loop...');
+            continuousMapUpdate();
+
+            // Periodic UI updates
+            setInterval(async () => {
+                currentNavalData = await navalTracking.fetchNavalData();
+                updateUI(osintFeeds, currentNavalData, militaryInstallationsData);
+            }, 60000); // Update every minute
+
+            // Process nuclear events for feed (check every 30 seconds)
+            setInterval(() => {
+                processNuclearEventsForFeed();
+            }, 30000);
+
+            // Initial nuclear event processing
+            setTimeout(() => {
+                processNuclearEventsForFeed();
+            }, 3000);
+
+            // Add shipping lane intel after map loads
+            setTimeout(() => {
+                addShippingLaneIntel();
+            }, 4000);
+
+            // Periodic shipping lane updates (every 5 minutes)
+            setInterval(() => {
+                addShippingLaneIntel();
+            }, 300000);
+        });
+
+        /**
+         * Add shipping lane intel to the feed using dynamic risk assessment
+         */
+        function addShippingLaneIntel() {
+            if (!mapRenderer || !window.shippingLaneRiskService) return;
+
+            const riskService = window.shippingLaneRiskService;
+
+            // Get all risk scores sorted by severity
+            const allRisks = riskService.getAllRiskScores().sort((a, b) => b.score - a.score);
+
+            // Report on high-risk routes (score > 50)
+            const highRiskRoutes = allRisks.filter(r => r.score > 50);
+
+            if (highRiskRoutes.length > 0) {
+                // Pick one to highlight
+                const risk = highRiskRoutes[Math.floor(Math.random() * highRiskRoutes.length)];
+                const lane = mapRenderer.getShippingLaneData().find(l => l.id === risk.routeId);
+
+                if (lane && risk.primaryThreat) {
+                    const level = risk.score >= 75 ? 'alert' : 'warning';
+                    addFeedItem(
+                        `MARITIME RISK [${risk.score}]: ${lane.name} - ${risk.primaryThreat}`,
+                        level,
+                        'SHIPPING'
+                    );
+                }
+            }
+
+            // Report recent incidents
+            const incidents = riskService.getRecentIncidents(5);
+            if (incidents.length > 0 && Math.random() > 0.6) {
+                const incident = incidents[Math.floor(Math.random() * incidents.length)];
+                const level = incident.severity >= 60 ? 'alert' : incident.severity >= 40 ? 'warning' : 'normal';
+                addFeedItem(
+                    `INCIDENT [${incident.age}]: ${incident.description} - ${incident.location}`,
+                    level,
+                    'MARITIME'
+                );
+            }
+
+            // Occasionally report active geopolitical factors
+            if (Math.random() > 0.7) {
+                const factors = riskService.getActiveGeopoliticalFactors();
+                if (factors.length > 0) {
+                    const factor = factors[Math.floor(Math.random() * factors.length)];
+                    const level = factor.severity >= 70 ? 'alert' : factor.severity >= 50 ? 'warning' : 'normal';
+                    addFeedItem(
+                        `GEOPOLITICAL: ${factor.name} [Severity: ${Math.round(factor.severity)}]`,
+                        level,
+                        'INTEL'
+                    );
+                }
+            }
+
+            // Report route recommendations for critical routes
+            if (Math.random() > 0.8) {
+                const criticalRoutes = allRisks.filter(r => r.score >= 70);
+                if (criticalRoutes.length > 0) {
+                    const route = criticalRoutes[0];
+                    const lane = mapRenderer.getShippingLaneData().find(l => l.id === route.routeId);
+                    if (lane && route.recommendation) {
+                        addFeedItem(
+                            `ADVISORY: ${lane.name} - ${route.recommendation}`,
+                            'warning',
+                            'SHIPPING'
+                        );
+                    }
+                }
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+</body>
+</html>
