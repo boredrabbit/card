@@ -959,17 +959,31 @@
                 height: 100dvh; /* Dynamic viewport height for mobile browsers */
             }
 
-            /* Status bar mobile - edge aligned */
+            /* Status bar mobile - minimal and clean */
             .status-bar {
                 padding: 0 16px;
                 padding-left: max(16px, env(safe-area-inset-left));
                 padding-right: max(16px, env(safe-area-inset-right));
                 font-size: 10px;
                 letter-spacing: 0.5px;
+                justify-content: space-between;
             }
 
+            /* Hide most status items on mobile - keep only essential */
             .status-item {
-                gap: 8px;
+                gap: 6px;
+            }
+
+            /* Hide verbose status items */
+            .status-item:nth-child(3),
+            .status-item:nth-child(4),
+            .status-item:nth-child(5) {
+                display: none !important;
+            }
+
+            /* Hide nuclear button on mobile (will default to on) */
+            .nuclear-toggle {
+                display: none !important;
             }
 
             /* Hide map completely on mobile */
@@ -3619,6 +3633,11 @@
         window.addEventListener('load', async () => {
             updateTime();
             setInterval(updateTime, 1000);
+
+            // Auto-enable nuclear tracking on mobile
+            if (window.innerWidth <= 768) {
+                nuclearLayerActive = true;
+            }
 
             // Add initial feed items
             addFeedItem('OSINT Situation Monitor initialized', 'normal', 'SYSTEM');
